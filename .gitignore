@@ -1,0 +1,18 @@
+*.egg-info
+*.pyc
+*.pyo
+.coverage
+.pytest_cache
+.python-version
+.tags
+build/
+dist/
+htmlcov/
+.eggs/
+.tox/
+.venv/
+.vscode/
+
+# Generated code
+src/flockwave/protocols/mavlink/dialects
+

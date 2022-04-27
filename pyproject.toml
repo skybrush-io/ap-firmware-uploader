@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "ap-uploader"
+version = "0.1.0"
+description = "Firmware uploader for ArduPilot and PX4 bootloaders"
+authors = ["Tamas Nepusz <ntamas@gmail.com>"]
+license = "MIT"
+packages = [
+    { include = "ap_uploader", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+rich = "^12.2.0"
+pyserial = "^3.5"
+anyio = "^3.5.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^7.1.1"
+trio = "^0.20.0"
+pytest-trio = "^0.7.0"
+coverage = { version = "^6.3.2", extras = ["toml"] }
+pytest-cov = "^3.0.0"
+
+[tool.poetry.scripts]
+ap-uploader = "ap_uploader.cli.__main__:main"
+
+[tool.coverage.paths]
+source = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["src/ap_uploader/mavlink.py"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = [
+  "raise NotImplementedError",
+  "def __repr__",
+  "pragma: no cover"
+]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
