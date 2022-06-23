@@ -15,4 +15,3 @@ htmlcov/
 
 # Generated code
 src/flockwave/protocols/mavlink/dialects
-
