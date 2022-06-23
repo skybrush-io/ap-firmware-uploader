@@ -1,9 +1,8 @@
 """TCP transport layer for the ArduPilot/PX4 uploader."""
 
 from anyio import connect_tcp, BusyResourceError, ClosedResourceError
-from anyio.abc import ByteStream, SocketAttribute
-from socket import AddressFamily
-from typing import Optional, Tuple
+from anyio.abc import ByteStream
+from typing import Optional
 
 from .base import Transport
 

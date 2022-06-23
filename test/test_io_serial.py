@@ -1,4 +1,4 @@
-from anyio import BusyResourceError, ClosedResourceError, EndOfStream, sleep
+from anyio import BusyResourceError, ClosedResourceError, EndOfStream
 from pytest import fixture, raises
 from random import randint
 from typing import List

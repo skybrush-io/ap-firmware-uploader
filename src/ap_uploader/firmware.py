@@ -1,6 +1,5 @@
 from abc import ABCMeta, abstractproperty
 from anyio import to_thread
-from collections.abc import Mapping
 from typing import Any, Dict, IO, Mapping, Optional, Tuple
 
 from .utils import crc32

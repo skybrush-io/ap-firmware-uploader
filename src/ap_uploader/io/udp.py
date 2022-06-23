@@ -2,7 +2,6 @@
 
 from anyio import create_udp_socket, ClosedResourceError
 from anyio.abc import SocketAttribute, UDPSocket
-from socket import AddressFamily
 from typing import Optional, Tuple
 
 from .base import Transport

@@ -9,7 +9,6 @@ from ap_uploader.protocol import (
     Protocol,
     LocalProtocolError,
     Command,
-    RemoteProtocolError,
     Response,
 )
 

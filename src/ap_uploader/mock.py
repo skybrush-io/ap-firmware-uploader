@@ -1,7 +1,6 @@
 __all__ = ("MockBootloader",)
 
 from anyio import fail_after
-from functools import partial
 from random import random
 
 from .io.base import Transport
@@ -255,9 +254,9 @@ def mock_main():  # pragma: no cover
         while True:
             bl = MockBootloader(transport)
             run(bl.run)
-            print(f":sparkles: Bootloader was requested to reboot.")
+            print(":sparkles: Bootloader was requested to reboot.")
     except KeyboardInterrupt:
-        print(f":door: Bootloader exited.")
+        print(":door: Bootloader exited.")
 
 
 if __name__ == "__main__":  # pragma: no cover

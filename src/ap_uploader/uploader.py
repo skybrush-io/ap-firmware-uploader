@@ -8,8 +8,6 @@ from ap_uploader.io.factory import create_transport
 from .connection import BootloaderConnection
 from .errors import NotSupportedError
 from .firmware import Firmware, load_firmware
-from .io.serial import SerialPortTransport
-from .io.udp import UDPTransport
 from .protocol import PROG_MULTI_MAX_PAYLOAD_LENGTH
 from .utils import crc32
 
@@ -134,11 +132,9 @@ class Uploader:
                         f"Bootloader version {bl_rev} not supported"
                     )
 
-                board_id = await connection.get_board_id()
-                board_revision = await connection.get_board_revision()
-                serial_number = (await connection.get_serial_number()).hex(
-                    ":", bytes_per_sep=1
-                )
+                await connection.get_board_id()
+                await connection.get_board_revision()
+                (await connection.get_serial_number()).hex(":", bytes_per_sep=1)
 
                 on_event(UploadStepEvent(step=UploadStep.ERASING))
                 await connection.erase_flash_memory()
