@@ -1,6 +1,6 @@
 from anyio import Lock, fail_after
 from contextlib import AbstractAsyncContextManager
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TypeVar, TYPE_CHECKING
 
 from .io.base import Transport
 from .protocol import (
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from .mavlink import MAVLink
 
 __all__ = ("BootloaderConnection",)
+
+C = TypeVar("C", bound="BootloaderConnection")
 
 
 class BootloaderConnection(AbstractAsyncContextManager):
@@ -57,7 +59,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
         self._system_id = system_id
         self._transport = transport
 
-    async def __aenter__(self):
+    async def __aenter__(self: C) -> C:
         await self._transport.__aenter__()
         return await super().__aenter__()
 
@@ -217,7 +219,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
                         sent = True
 
             elif event is NEED_MORE_DATA:
-                # Read data from the serial port and feed it into the protocol
+                # Read data from the transport and feed it into the protocol
                 # TODO(ntamas): what if the other side is constantly sending
                 # garbage?
                 if not has_timeout:
