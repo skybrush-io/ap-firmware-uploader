@@ -18,6 +18,8 @@ __all__ = (
     "UploaderEvent",
     "UploaderLifecycleEvent",
     "UploadProgressEvent",
+    "LogEvent",
+    "CRCMismatchEvent",
 )
 
 
@@ -95,6 +97,21 @@ class CRCMismatchEvent(UploaderEvent):
 
     observed: int
     """The observed CRC."""
+
+
+@dataclass
+class LogEvent(UploaderEvent):
+    """Debug event that may contain any arbitrary message with an associated
+    log leve.
+    """
+
+    __slots__ = ("level", "message")
+
+    level: int
+    """Log level of the message"""
+
+    message: str
+    """The message itself"""
 
 
 class Uploader:

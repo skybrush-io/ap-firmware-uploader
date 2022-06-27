@@ -1,3 +1,5 @@
+import logging
+
 from argparse import ArgumentParser
 from contextlib import AbstractContextManager
 from functools import partial
@@ -5,6 +7,8 @@ from typing import Any, Dict, TYPE_CHECKING
 
 from ap_uploader.uploader import (
     CRCMismatchEvent,
+    LogEvent,
+    UploadStep,
     Uploader,
     UploaderEvent,
     UploaderLifecycleEvent,
@@ -65,6 +69,8 @@ class UploaderConsoleUI(AbstractContextManager):
             self._progress.update(task_id, completed=round(event.progress * 100))
         elif isinstance(event, UploadStepEvent):
             task_id = self._get_task_id_for_uploader(sender)
+            if event.step is UploadStep.UPLOADING:
+                self._progress.start_task(task_id)
             self._progress.update(task_id, description=event.step.description.ljust(13))
         elif isinstance(event, UploaderLifecycleEvent):
             if event.type == "finished":
@@ -75,6 +81,13 @@ class UploaderConsoleUI(AbstractContextManager):
             self._print_error(
                 f"CRC mismatch, expected 0x{event.expected:04x}, got 0x{event.observed:04x}"
             )
+        elif isinstance(event, LogEvent):
+            if event.level >= logging.ERROR:
+                self._print_error(event.message)
+            elif event.level >= logging.WARNING:
+                self._print_warning(event.message)
+            else:
+                self._print_message(event.message)
 
     def _get_task_id_for_uploader(
         self, uploader: Uploader, *, create: bool = True
@@ -82,13 +95,21 @@ class UploaderConsoleUI(AbstractContextManager):
         """Returns the task ID corresponding to the given uploader task."""
         task_id = self._uploader_to_task_id.get(uploader)
         if task_id is None:
-            task_id = self._progress.add_task(description="Starting...")
+            task_id = self._progress.add_task(description="Starting...", start=False)
             self._uploader_to_task_id[uploader] = task_id
         return task_id
 
     def _print_error(self, message: str) -> None:
         """Prints an error message to the console output."""
         self._progress.console.print(f"[red bold]:x:[/red bold] {message}")
+
+    def _print_warning(self, message: str) -> None:
+        """Prints a warning message to the console output."""
+        self._progress.console.print(f"[yellow bold]![/yellow bold] {message}")
+
+    def _print_message(self, message: str) -> None:
+        """Prints an informational message to the console output."""
+        self._progress.console.print(f"[green bold]>[/green bold] {message}")
 
 
 async def uploader(options) -> None:
