@@ -1,6 +1,6 @@
 __all__ = ("MockBootloader",)
 
-from anyio import fail_after
+from anyio import fail_after, sleep, TASK_STATUS_IGNORED
 from random import random
 
 from .io.base import Transport
@@ -9,6 +9,10 @@ from .utils import crc32
 
 
 class InvalidCommandError(RuntimeError):
+    pass
+
+
+class SimulatedPacketDelayError(RuntimeError):
     pass
 
 
@@ -23,6 +27,11 @@ class MockBootloader:
 
     _buffer: bytes = b""
     """Internal buffer holding yet-unprocessed bytes."""
+
+    _drop_next_response: bool = False
+    """Stores whether to drop the next response packet forcefully, for testing
+    purposes.
+    """
 
     _flash_memory: bytearray
     """Byte array containing the simulated flash memory."""
@@ -46,8 +55,8 @@ class MockBootloader:
 
     simulate_desync: bool = False
     """Stores whether to simulate a de-synchronization between the bootloader
-    and the uploader by intentionally "losing" confirmation packets from the
-    bootloader to the uploader script after a PROG_MULTI command.
+    and the uploader by intentionally "losing" or "delaying" confirmation
+    packets from the bootloader to the uploader script after a PROG_MULTI command.
     """
 
     def __init__(
@@ -62,11 +71,20 @@ class MockBootloader:
         """Returns the internal simulated flash memory."""
         return self._flash_memory
 
-    async def run(self):
+    def drop_next_response(self) -> None:
+        """Forces the mock bootloader to drop the next response packet."""
+        self._drop_next_response = True
+
+    def set_write_pointer(self, value: int) -> None:
+        """Sets the value of the write pointer of the flash memory."""
+        self._flash_memory_write_ptr = value
+
+    async def run(self, *, task_status=TASK_STATUS_IGNORED):
         """Handles incoming commands from the transport and sends appropriate
         responses.
         """
         async with self._transport:
+            task_status.started()
             while not self._should_exit:
                 try:
                     command = await self._receive_next_command()
@@ -79,8 +97,14 @@ class MockBootloader:
                         response = Response.invalid()
                     except SimulatedPacketLossError:
                         response = None
+                    except SimulatedPacketDelayError:
+                        await sleep(0.6)  # should be larger than the timeout
+                        response = Response.success(b"")
                     except Exception:  # pragma: no cover
                         response = Response.failure()
+                if self._drop_next_response:
+                    response = None
+                    self._drop_next_response = False
                 if response is not None:
                     await self._transport.send(response.to_bytes())
 
@@ -221,6 +245,8 @@ class MockBootloader:
                 p = random()
                 if p < 0.01:
                     raise SimulatedPacketLossError()
+                elif p < 0.02:
+                    raise SimulatedPacketDelayError()
 
         else:
             self._write_to_flash_memory(data[:-excess])
@@ -253,6 +279,7 @@ def mock_main():  # pragma: no cover
     try:
         while True:
             bl = MockBootloader(transport)
+            bl.simulate_desync = True
             run(bl.run)
             print(":sparkles: Bootloader was requested to reboot.")
     except KeyboardInterrupt:

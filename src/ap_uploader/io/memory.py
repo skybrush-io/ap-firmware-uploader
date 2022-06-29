@@ -18,6 +18,7 @@ class InMemoryTransport(Transport):
 
     def __init__(
         self,
+        buffer_size: int = 0,
         *,
         _sender: Optional[ObjectSendStream[bytes]] = None,
         _receiver: Optional[ObjectReceiveStream[bytes]] = None,
@@ -25,8 +26,12 @@ class InMemoryTransport(Transport):
     ):
         """Constructor."""
         if _peer is None:
-            sender_tx, sender_rx = create_memory_object_stream(0, item_type=bytes)
-            receiver_tx, receiver_rx = create_memory_object_stream(0, item_type=bytes)
+            sender_tx, sender_rx = create_memory_object_stream(
+                buffer_size, item_type=bytes
+            )
+            receiver_tx, receiver_rx = create_memory_object_stream(
+                buffer_size, item_type=bytes
+            )
 
             self._sender = sender_tx
             self._receiver = receiver_rx
@@ -41,8 +46,14 @@ class InMemoryTransport(Transport):
             self._receiver = _receiver
             self._peer = _peer
 
+    async def __aenter__(self):
+        await self._sender.__aenter__()
+        await self._receiver.__aenter__()
+        return await super().__aenter__()
+
     async def aclose(self) -> None:
         await self._sender.aclose()
+        await self._receiver.aclose()
 
     async def receive(self) -> bytes:
         return await self._receiver.receive()

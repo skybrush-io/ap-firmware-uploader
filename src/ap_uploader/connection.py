@@ -249,8 +249,13 @@ class BootloaderConnection(AbstractAsyncContextManager):
                     event.get_payload_or_raise_exception()
 
             elif isinstance(event, ExcessData):
-                # Ignore excess data for the time being
-                pass
+                # Hmmm, we got de-synced, we might have received data that
+                # belonged to a previous command
+                self._protocol.reset()
+                if not retries_left:
+                    raise
+                else:
+                    retries_left -= 1
 
             else:
                 raise RuntimeError(f"unexpected event: {event!r}")
