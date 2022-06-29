@@ -1,7 +1,12 @@
+import logging
+
+from anyio import create_task_group, get_cancelled_exc_class
+from anyio.abc import TaskGroup
 from dataclasses import dataclass
 from enum import Enum
+from functools import partial
 from itertools import repeat
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, TypeVar
 
 from ap_uploader.io.factory import create_transport
 
@@ -62,6 +67,12 @@ class UploaderLifecycleEvent(UploaderEvent):
 
     type: str
     """The type of the event."""
+
+    success: Optional[bool] = None
+    """Whether the upload was successful; only valid for "finished" events."""
+
+    cancelled: Optional[bool] = None
+    """Whether the upload was cancelled; only valid for "finished" events."""
 
 
 @dataclass
@@ -124,18 +135,52 @@ class Uploader:
         """Constructor."""
         self._firmware = None
 
+    def create_task_group(
+        self, *, on_event: Callable[[str, UploaderEvent], None], retries: int = 0
+    ) -> "UploaderTaskGroup":
+        """Creates a task group that is responsible for running multiple upload
+        tasks in parallel, with configurable retry counts, in a way that upload
+        tasks are shielded from errors in other tasks.
+
+        Parameters:
+            port: the port to upload the firmware to. May be an IP address or
+                the identifier of a serial port.
+            on_event: a synchronous callback to call when an event happens
+                during the upload process. The callback will be called with the
+                port that the upload is targeting and the event itself.
+                Typically this is tied to a user interface object so the UI is
+                updated during the upload properly.
+            retries: number of retries for failed tasks before the task group
+                gives up on the task completely
+        """
+        return UploaderTaskGroup(self, on_event=on_event, retries=retries)
+
     async def load_firmware(self, path: str) -> None:
+        """Loads the firmware file at the given path."""
         self._firmware = await load_firmware(path)
 
     async def upload_firmware(
         self, port: str, *, on_event: Callable[[UploaderEvent], None]
     ) -> None:
+        """Runs an asynchronous task to upload the loaded firmware into the
+        drone at the given port.
+
+        Parameters:
+            port: the port to upload the firmware to. May be an IP address or
+                the identifier of a serial port.
+            on_event: a synchronous callback to call when an event happens
+                during the upload process. The callback will be called with the
+                event as its only argument. Typically this is tied to a user
+                interface object so the UI is updated during the upload properly.
+        """
         firmware = self._firmware
         if firmware is None:
             raise RuntimeError("firmware is not loaded yet")
 
         on_event(UploaderLifecycleEvent(type="started"))
         on_event(UploadStepEvent(step=UploadStep.CONNECTING))
+
+        success, cancelled = False, False
 
         try:
             transport = create_transport(port)
@@ -205,7 +250,86 @@ class Uploader:
                 await connection.reboot()
 
                 on_event(UploadStepEvent(step=UploadStep.FINISHED))
+
+                success = True
+        except get_cancelled_exc_class():
+            cancelled = True
+            raise
         except TimeoutError:
             on_event(UploaderLifecycleEvent(type="timeout"))
+            raise
         finally:
-            on_event(UploaderLifecycleEvent(type="finished"))
+            on_event(
+                UploaderLifecycleEvent(
+                    type="finished", success=success, cancelled=cancelled
+                )
+            )
+
+
+T = TypeVar("T", bound="UploaderTaskGroup")
+
+
+class UploaderTaskGroup:
+    """A task group that is responsible for running multiple upload tasks in
+    parallel, with configurable retry counts, in a way that upload tasks are
+    shielded from errors in other tasks.
+    """
+
+    _on_event: Callable[[str, UploaderEvent], None]
+    """Callable that will be called with port identifiers and upload events
+    during the upload process. This callback can be used to update an
+    attached UI.
+    """
+
+    _retries: int
+    """Number of retries for failed tasks before the task group gives up on the
+    task completely.
+    """
+
+    _uploader: Uploader
+    """The uploader that owns this task group."""
+
+    _task_group: TaskGroup
+    """The anyio task group that runs the upload tasks."""
+
+    def __init__(
+        self,
+        uploader: Uploader,
+        *,
+        on_event: Callable[[str, UploaderEvent], None],
+        retries: int = 0,
+    ):
+        """Constructor."""
+        self._retries = retries
+        self._on_event = on_event
+        self._uploader = uploader
+        self._task_group = create_task_group()
+
+    async def __aenter__(self: T) -> T:
+        await self._task_group.__aenter__()
+        return self
+
+    async def __aexit__(self, *args: Any) -> Optional[bool]:
+        return await self._task_group.__aexit__(*args)
+
+    def start_upload_to(self, port: str) -> None:
+        self._task_group.start_soon(self._run_upload_in_protected_context, port)
+
+    async def _run_upload_in_protected_context(self, port: str) -> None:
+        on_event = partial(self._on_event, port)
+        attempt = 0
+        while attempt <= self._retries:
+            try:
+                await self._uploader.upload_firmware(port, on_event=on_event)
+            except Exception as ex:
+                if isinstance(ex, TimeoutError):
+                    message = "Upload timed out"
+                else:
+                    message = f"Upload failed: {ex}"
+                if attempt < self._retries:
+                    on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
+                else:
+                    on_event(LogEvent(logging.ERROR, message))
+                attempt += 1
+            else:
+                break

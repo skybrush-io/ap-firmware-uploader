@@ -210,7 +210,9 @@ class SerialPortByteStream(ByteStream):
             # Now we can also invalidate the reader stream. We cannot do it
             # before this point because then we would prevent the user from
             # reading the pending data from the port
-            self._reader_stream = None
+            if self._reader_stream:
+                await self._reader_stream.aclose()
+                self._reader_stream = None
 
     async def receive(self, max_bytes: int = 65536) -> bytes:
         """Reads at most the given number of bytes from the serial port.
