@@ -268,6 +268,12 @@ def mock_main():  # pragma: no cover
     parser.add_argument(
         "-d", "--debug", action="store_true", default=False, help="show debug output"
     )
+    parser.add_argument(
+        "--desync",
+        action="store_true",
+        default=False,
+        help="simulate bootloader de-synchronization due to packet loss and delays",
+    )
     options = parser.parse_args()
 
     port = options.port
@@ -279,7 +285,7 @@ def mock_main():  # pragma: no cover
     try:
         while True:
             bl = MockBootloader(transport)
-            bl.simulate_desync = True
+            bl.simulate_desync = options.desync
             run(bl.run)
             print(":sparkles: Bootloader was requested to reboot.")
     except KeyboardInterrupt:
