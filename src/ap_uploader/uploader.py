@@ -1,3 +1,4 @@
+import errno
 import logging
 
 from anyio import create_task_group, get_cancelled_exc_class
@@ -326,6 +327,17 @@ class UploaderTaskGroup:
                     message = "Upload timed out"
                 else:
                     message = f"Upload failed: {ex}"
+
+                should_retry = True
+                if isinstance(ex, OSError) and ex.errno in (
+                    errno.ENOENT,
+                    errno.EADDRINUSE,
+                ):
+                    should_retry = False
+
+                if not should_retry:
+                    attempt = self._retries
+
                 if attempt < self._retries:
                     on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
                 else:
