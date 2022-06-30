@@ -83,7 +83,9 @@ class UploaderConsoleUI(AbstractContextManager):
                     if event.cancelled:
                         description = "[yellow bold]Cancelled    [/yellow bold]"
                     else:
-                        description = "[red bold]Failed       [/red bold]"
+                        description = "[red bold]Failed :(    [/red bold]"
+                else:
+                    description = "[green bold]Finished.    [/green bold]"
                     self._progress.update(task_id, description=description)
                 self._progress.stop_task(task_id)
                 # Do not remove the association between sender and task ID in
