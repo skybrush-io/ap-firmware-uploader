@@ -3,6 +3,8 @@ __all__ = ("MockBootloader",)
 from anyio import fail_after, sleep, TASK_STATUS_IGNORED
 from random import random
 
+from ap_uploader.io.udp import UDPListenerTransport
+
 from .io.base import Transport
 from .protocol import Command, DeviceInfoItem, OpCode, Protocol, Response
 from .utils import crc32
@@ -276,9 +278,14 @@ async def run_mock_bootloaders(options) -> None:
 
     async with create_task_group() as tg:
         for port in options.port:
-            transport = SerialPortTransport.from_url(
-                f"spy://{port}" if options.debug else port
-            )
+            try:
+                port_number = int(port)
+                transport = UDPListenerTransport("127.0.0.1", port_number)
+                port = f"127.0.0.1:{port}"
+            except ValueError:
+                transport = SerialPortTransport.from_url(
+                    f"spy://{port}" if options.debug else port
+                )
             tg.start_soon(run_mock_bootloader, port, transport, options)
 
 
@@ -291,7 +298,9 @@ def mock_main():  # pragma: no cover
 
     parser = ArgumentParser()
     parser.add_argument(
-        "port", help="serial port to connect the mock bootloader to", nargs="*"
+        "port",
+        help="serial port or UDP port number to bind the mock bootloader to",
+        nargs="*",
     )
     parser.add_argument(
         "-d", "--debug", action="store_true", default=False, help="show debug output"

@@ -140,14 +140,13 @@ async def uploader(options) -> None:
                 "No ports were provided, exiting. Use -p to specify the upload port."
             )
 
-        up = Uploader()
-
-        await up.load_firmware(options.firmware)
-        async with up.create_task_group(
-            on_event=ui.handle_event, retries=3
-        ) as task_group:
-            for port in ports:
-                task_group.start_upload_to(port)
+        async with Uploader().use() as up:
+            await up.load_firmware(options.firmware)
+            async with up.create_task_group(
+                on_event=ui.handle_event, retries=3
+            ) as task_group:
+                for port in ports:
+                    task_group.start_upload_to(port)
 
 
 def main() -> None:

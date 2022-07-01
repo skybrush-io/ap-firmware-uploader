@@ -253,7 +253,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
                 # belonged to a previous command
                 self._protocol.reset()
                 if not retries_left:
-                    raise
+                    raise RuntimeError("unexpected data received")
                 else:
                     retries_left -= 1
 
