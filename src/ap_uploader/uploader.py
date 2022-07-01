@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import errno
 import logging
 
-from anyio import create_task_group, get_cancelled_exc_class, Lock, open_cancel_scope
+from anyio import create_task_group, get_cancelled_exc_class, Lock, CapacityLimiter
 from anyio.abc import TaskGroup
 from dataclasses import dataclass
 from enum import Enum
@@ -153,7 +153,11 @@ class Uploader:
         self._shared_udp_socket_lock = Lock()
 
     def create_task_group(
-        self, *, on_event: Callable[[str, UploaderEvent], None], retries: int = 0
+        self,
+        *,
+        on_event: Callable[[str, UploaderEvent], None],
+        retries: int = 0,
+        max_concurrency: int = 0,
     ) -> "UploaderTaskGroup":
         """Creates a task group that is responsible for running multiple upload
         tasks in parallel, with configurable retry counts, in a way that upload
@@ -169,8 +173,13 @@ class Uploader:
                 updated during the upload properly.
             retries: number of retries for failed tasks before the task group
                 gives up on the task completely
+            max_concurrency: maximum number of upload tasks that can be running
+                in parallel in the task group. Zero or negative numbers mean
+                infinity.
         """
-        return UploaderTaskGroup(self, on_event=on_event, retries=retries)
+        return UploaderTaskGroup(
+            self, on_event=on_event, retries=retries, max_concurrency=max_concurrency
+        )
 
     async def load_firmware(self, path: str) -> None:
         """Loads the firmware file at the given path."""
@@ -349,6 +358,11 @@ class UploaderTaskGroup:
     attached UI.
     """
 
+    _limiter: Optional[CapacityLimiter] = None
+    """An optional capacity limiter that can be used to limit the maximum
+    number of concurrent upload tasks.
+    """
+
     _retries: int
     """Number of retries for failed tasks before the task group gives up on the
     task completely.
@@ -366,8 +380,12 @@ class UploaderTaskGroup:
         *,
         on_event: Callable[[str, UploaderEvent], None],
         retries: int = 0,
+        max_concurrency: int = 0,
     ):
         """Constructor."""
+        self._limiter = (
+            CapacityLimiter(max_concurrency) if max_concurrency > 0 else None
+        )
         self._retries = retries
         self._on_event = on_event
         self._uploader = uploader
@@ -387,7 +405,11 @@ class UploaderTaskGroup:
         on_event = partial(self._on_event, port)
         attempt = 0
         while attempt <= self._retries:
+            acquired = False
             try:
+                if self._limiter:
+                    await self._limiter.acquire()
+                    acquired = True
                 await self._uploader.upload_firmware(port, on_event=on_event)
             except Exception as ex:
                 if isinstance(ex, TimeoutError):
@@ -416,3 +438,6 @@ class UploaderTaskGroup:
                 attempt += 1
             else:
                 break
+            finally:
+                if acquired and self._limiter:
+                    self._limiter.release()
