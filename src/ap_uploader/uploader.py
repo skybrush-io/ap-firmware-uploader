@@ -1,18 +1,22 @@
+from contextlib import asynccontextmanager
+import errno
 import logging
 
-from anyio import create_task_group, get_cancelled_exc_class
+from anyio import create_task_group, get_cancelled_exc_class, Lock, CapacityLimiter
 from anyio.abc import TaskGroup
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
+from ipaddress import ip_address
 from itertools import repeat
-from typing import Any, Callable, Optional, TypeVar
-
-from ap_uploader.io.factory import create_transport
+from typing import Any, AsyncIterator, Callable, Optional, TypeVar
 
 from .connection import BootloaderConnection
 from .errors import NotSupportedError
 from .firmware import Firmware, load_firmware
+from .io.base import Transport
+from .io.udp import SharedUDPSocket, UDPTransport
+from .io.serial import SerialPortTransport
 from .protocol import PROG_MULTI_MAX_PAYLOAD_LENGTH
 from .utils import crc32
 
@@ -125,18 +129,35 @@ class LogEvent(UploaderEvent):
     """The message itself"""
 
 
+C = TypeVar("C", bound="Uploader")
+
+
 class Uploader:
-    _firmware: Optional[Firmware]
+    _firmware: Optional[Firmware] = None
     """The firmware that the uploader will upload; ``None`` if it is not loaded
     yet.
     """
 
+    _shared_udp_socket: Optional[SharedUDPSocket] = None
+    """A shared UDP socket that will be used by the uploader tasks spawned from
+    this uploader to communicate with upload targets. Constructed on-demand
+    when the first UDP socket is needed.
+    """
+
+    _shared_udp_socket_lock: Lock
+
+    _task_group: Optional[TaskGroup] = None
+    """The task group used privately by the uploader to run its private tasks."""
+
     def __init__(self):
-        """Constructor."""
-        self._firmware = None
+        self._shared_udp_socket_lock = Lock()
 
     def create_task_group(
-        self, *, on_event: Callable[[str, UploaderEvent], None], retries: int = 0
+        self,
+        *,
+        on_event: Callable[[str, UploaderEvent], None],
+        retries: int = 0,
+        max_concurrency: int = 0,
     ) -> "UploaderTaskGroup":
         """Creates a task group that is responsible for running multiple upload
         tasks in parallel, with configurable retry counts, in a way that upload
@@ -152,8 +173,13 @@ class Uploader:
                 updated during the upload properly.
             retries: number of retries for failed tasks before the task group
                 gives up on the task completely
+            max_concurrency: maximum number of upload tasks that can be running
+                in parallel in the task group. Zero or negative numbers mean
+                infinity.
         """
-        return UploaderTaskGroup(self, on_event=on_event, retries=retries)
+        return UploaderTaskGroup(
+            self, on_event=on_event, retries=retries, max_concurrency=max_concurrency
+        )
 
     async def load_firmware(self, path: str) -> None:
         """Loads the firmware file at the given path."""
@@ -183,7 +209,7 @@ class Uploader:
         success, cancelled = False, False
 
         try:
-            transport = create_transport(port)
+            transport = await self._create_transport(port)
             async with BootloaderConnection(transport) as connection:
                 await connection.ensure_in_bootloader()
 
@@ -265,6 +291,57 @@ class Uploader:
                 )
             )
 
+    @asynccontextmanager
+    async def use(self: C) -> AsyncIterator[C]:
+        async with create_task_group() as tg:
+            try:
+                self._task_group = tg
+                yield self
+                tg.cancel_scope.cancel()
+            finally:
+                self._task_group = None
+
+    async def _create_transport(self, spec: str) -> Transport:
+        """Creates a transport from a specification string.
+
+        When the specification string is a valid IPv4 or IPv6 address, optionally
+        followed by a colon and a port number, the returned transport will be
+        an instance of UDPTransport_; otherwise the input assumed to be a serial
+        port and the returned transport will be an instance of SerialTransport_.
+        """
+        address, sep, port = spec.partition(":")
+        if sep:
+            # We have found an IP address and a port
+            shared_udp_socket = await self._ensure_shared_udp_socket_is_up()
+            return UDPTransport(shared_udp_socket, address, int(port))
+
+        try:
+            ip_address(spec)
+        except ValueError:
+            # It must be a serial port
+            return SerialPortTransport.from_url(spec)
+        else:
+            # It seems like an IP address without a port number, assume 14555
+            shared_udp_socket = await self._ensure_shared_udp_socket_is_up()
+            return UDPTransport(shared_udp_socket, spec, 14555)
+
+    async def _ensure_shared_udp_socket_is_up(self) -> SharedUDPSocket:
+        """Ensures that the shared UDP socket required to handle multiple
+        concurrent uploads is open.
+
+        Returns:
+            the shared UDP socket
+        """
+        async with self._shared_udp_socket_lock:
+            if self._shared_udp_socket is None:
+                if self._task_group is None:
+                    raise RuntimeError("uploader is not in use yet")
+
+                self._shared_udp_socket = SharedUDPSocket("0.0.0.0", 14555)
+                await self._task_group.start(self._shared_udp_socket.run)
+
+        return self._shared_udp_socket
+
 
 T = TypeVar("T", bound="UploaderTaskGroup")
 
@@ -279,6 +356,11 @@ class UploaderTaskGroup:
     """Callable that will be called with port identifiers and upload events
     during the upload process. This callback can be used to update an
     attached UI.
+    """
+
+    _limiter: Optional[CapacityLimiter] = None
+    """An optional capacity limiter that can be used to limit the maximum
+    number of concurrent upload tasks.
     """
 
     _retries: int
@@ -298,8 +380,12 @@ class UploaderTaskGroup:
         *,
         on_event: Callable[[str, UploaderEvent], None],
         retries: int = 0,
+        max_concurrency: int = 0,
     ):
         """Constructor."""
+        self._limiter = (
+            CapacityLimiter(max_concurrency) if max_concurrency > 0 else None
+        )
         self._retries = retries
         self._on_event = on_event
         self._uploader = uploader
@@ -319,13 +405,32 @@ class UploaderTaskGroup:
         on_event = partial(self._on_event, port)
         attempt = 0
         while attempt <= self._retries:
+            acquired = False
             try:
+                if self._limiter:
+                    await self._limiter.acquire()
+                    acquired = True
                 await self._uploader.upload_firmware(port, on_event=on_event)
             except Exception as ex:
                 if isinstance(ex, TimeoutError):
                     message = "Upload timed out"
-                else:
+                elif isinstance(ex, RuntimeError):
                     message = f"Upload failed: {ex}"
+                elif isinstance(ex, OSError):
+                    message = f"Upload failed: {ex.strerror}"
+                else:
+                    message = f"Upload failed: {ex!r}"
+
+                should_retry = True
+                if isinstance(ex, OSError) and ex.errno in (
+                    errno.ENOENT,
+                    errno.EADDRINUSE,
+                ):
+                    should_retry = False
+
+                if not should_retry:
+                    attempt = self._retries
+
                 if attempt < self._retries:
                     on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
                 else:
@@ -333,3 +438,6 @@ class UploaderTaskGroup:
                 attempt += 1
             else:
                 break
+            finally:
+                if acquired and self._limiter:
+                    self._limiter.release()

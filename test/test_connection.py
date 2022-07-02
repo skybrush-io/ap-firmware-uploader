@@ -25,13 +25,13 @@ class DelayedInMemoryTransport(InMemoryTransport):
 
     async def send(self, data: bytes) -> None:
         await super().send(data)
-        print(f"--> {data!r}")
+        if self.log:
+            print(f"--> {data!r}")
 
 
 async def test_uploader_bug_1(nursery, autojump_clock):
     transport = DelayedInMemoryTransport(buffer_size=4)
     bootloader = MockBootloader(transport.peer)
-    transport.log = True
 
     async def run_bootloader(task_status):
         try:

@@ -25,6 +25,20 @@ def create_parser() -> ArgumentParser:
     parser = ArgumentParser(description="ArduPilot/PX4 firmware uploader")
     parser.add_argument("firmware", help="path to the firmware file to upload")
     parser.add_argument(
+        "--max-concurrency",
+        metavar="NUM_TASKS",
+        type=int,
+        help="allow at most NUM_TASKS parallel upload tasks to be running at the same time",
+        default=0,
+    )
+    parser.add_argument(
+        "--retries",
+        metavar="COUNT",
+        type=int,
+        help="retry failed upload tasks COUNT times before giving up",
+        default=3,
+    )
+    parser.add_argument(
         "-p",
         "--port",
         help="serial port or IP address that the uploader will send data to",
@@ -86,7 +100,7 @@ class UploaderConsoleUI(AbstractContextManager):
                         description = "[red bold]Failed :(    [/red bold]"
                 else:
                     description = "[green bold]Finished.    [/green bold]"
-                    self._progress.update(task_id, description=description)
+                self._progress.update(task_id, description=description)
                 self._progress.stop_task(task_id)
                 # Do not remove the association between sender and task ID in
                 # case the upload is retried -- we don't want to create a new
@@ -133,6 +147,8 @@ class UploaderConsoleUI(AbstractContextManager):
 
 async def uploader(options) -> None:
     ports: List[str] = options.port
+    max_concurrency: int = max(options.max_concurrency, 0)
+    retries: int = max(options.retries, 0)
 
     with UploaderConsoleUI() as ui:
         if not ports:
@@ -140,14 +156,15 @@ async def uploader(options) -> None:
                 "No ports were provided, exiting. Use -p to specify the upload port."
             )
 
-        up = Uploader()
-
-        await up.load_firmware(options.firmware)
-        async with up.create_task_group(
-            on_event=ui.handle_event, retries=3
-        ) as task_group:
-            for port in ports:
-                task_group.start_upload_to(port)
+        async with Uploader().use() as up:
+            await up.load_firmware(options.firmware)
+            async with up.create_task_group(
+                on_event=ui.handle_event,
+                max_concurrency=max_concurrency,
+                retries=retries,
+            ) as task_group:
+                for port in ports:
+                    task_group.start_upload_to(port)
 
 
 def main() -> None:
