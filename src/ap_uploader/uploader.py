@@ -1,9 +1,15 @@
-from contextlib import asynccontextmanager
 import errno
 import logging
 
-from anyio import create_task_group, get_cancelled_exc_class, Lock, CapacityLimiter
+from anyio import (
+    create_task_group,
+    get_cancelled_exc_class,
+    Lock,
+    CapacityLimiter,
+    to_thread,
+)
 from anyio.abc import TaskGroup
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
@@ -262,9 +268,8 @@ class Uploader:
                         on_event(UploadProgressEvent(progress=progress))
 
                 on_event(UploadStepEvent(step=UploadStep.VERIFYING))
-                # TODO(ntamas): this is potentially CPU-intensive, make it faster
-                expected_crc = crc32(
-                    repeat(255, flash_size - firmware.image_size), state=firmware.crc
+                expected_crc = await to_thread.run_sync(
+                    crc32, repeat(255, flash_size - firmware.image_size), firmware.crc
                 )
                 observed_crc = await connection.get_flash_memory_crc()
                 if expected_crc != observed_crc:
