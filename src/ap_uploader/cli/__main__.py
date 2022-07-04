@@ -1,9 +1,10 @@
 import logging
 
 from argparse import ArgumentParser
-from contextlib import AbstractContextManager
-from functools import partial
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from contextlib import aclosing, AbstractContextManager, AsyncExitStack
+from typing import Any, AsyncIterable, Dict, Iterable, List, Optional, TYPE_CHECKING
+from ap_uploader.scanners.fixed import FixedTargetList
+from ap_uploader.scanners.udp import UDPMAVLinkHeartbeatScanner
 
 from ap_uploader.uploader import (
     CRCMismatchEvent,
@@ -124,8 +125,11 @@ class UploaderConsoleUI(AbstractContextManager):
             sign = "[yellow bold]![/yellow bold]"
         else:
             sign = "[green bold]>[/green bold]"
-        sender = self._format_sender(sender or "")
-        self._progress.console.print(f"{sign} {sender} {message}")
+        if sender:
+            sender = self._format_sender(sender)
+            self._progress.console.print(f"{sign} {sender} {message}")
+        else:
+            self._progress.console.print(f"{sign} {message}")
 
     def _format_sender(self, sender: str) -> str:
         return f"[bold white]{sender:<15}[/bold white]"
@@ -151,20 +155,31 @@ async def uploader(options) -> None:
     retries: int = max(options.retries, 0)
 
     with UploaderConsoleUI() as ui:
-        if not ports:
-            ui.log(
-                "No ports were provided, exiting. Use -p to specify the upload port."
+        async with AsyncExitStack() as stack:
+            up = await stack.enter_async_context(Uploader().use())
+            await up.load_firmware(options.firmware)
+
+            upload_task_group = await stack.enter_async_context(
+                up.create_task_group(
+                    on_event=ui.handle_event,
+                    max_concurrency=max_concurrency,
+                    retries=retries,
+                )
             )
 
-        async with Uploader().use() as up:
-            await up.load_firmware(options.firmware)
-            async with up.create_task_group(
-                on_event=ui.handle_event,
-                max_concurrency=max_concurrency,
-                retries=retries,
-            ) as task_group:
-                for port in ports:
-                    task_group.start_upload_to(port)
+            if ports:
+                scanner = FixedTargetList(ports)
+            else:
+                ui.log(
+                    f"Listening on UDP port 14550 for MAVLink heartbeats, ^C to exit..."
+                )
+                socket = await up.get_shared_udp_socket()
+                scanner = UDPMAVLinkHeartbeatScanner(socket)
+
+            upload_target_generator = up.generate_targets_from(scanner)
+            async with aclosing(upload_target_generator) as upload_targets:  # type: ignore
+                async for target in upload_targets:
+                    upload_task_group.start_upload_to(target)
 
 
 def main() -> None:

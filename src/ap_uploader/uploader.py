@@ -15,7 +15,7 @@ from enum import Enum
 from functools import partial
 from ipaddress import ip_address
 from itertools import repeat
-from typing import Any, AsyncIterator, Callable, Optional, TypeVar
+from typing import Any, AsyncIterable, AsyncIterator, Callable, Optional, TypeVar
 
 from .connection import BootloaderConnection
 from .errors import NotSupportedError
@@ -24,6 +24,7 @@ from .io.base import Transport
 from .io.udp import SharedUDPSocket, UDPTransport
 from .io.serial import SerialPortTransport
 from .protocol import PROG_MULTI_MAX_PAYLOAD_LENGTH
+from .scanners.base import Scanner, UploadTarget
 from .utils import crc32
 
 
@@ -187,6 +188,18 @@ class Uploader:
             self, on_event=on_event, retries=retries, max_concurrency=max_concurrency
         )
 
+    async def generate_targets_from(
+        self, scanner: Scanner
+    ) -> AsyncIterable[UploadTarget]:
+        async for target in scanner.run():
+            yield target
+
+    async def get_shared_udp_socket(self) -> SharedUDPSocket:
+        """Returns a shared UDP socket that listens on UDP port 14555 and can
+        be used simultaneously by upload tasks and scanner tasks.
+        """
+        return await self._ensure_shared_udp_socket_is_up()
+
     async def load_firmware(self, path: str) -> None:
         """Loads the firmware file at the given path."""
         self._firmware = await load_firmware(path)
@@ -306,7 +319,7 @@ class Uploader:
             finally:
                 self._task_group = None
 
-    async def _create_transport(self, spec: str) -> Transport:
+    async def _create_transport(self, spec: UploadTarget) -> Transport:
         """Creates a transport from a specification string.
 
         When the specification string is a valid IPv4 or IPv6 address, optionally
@@ -317,7 +330,7 @@ class Uploader:
         address, sep, port = spec.partition(":")
         if sep:
             # We have found an IP address and a port
-            shared_udp_socket = await self._ensure_shared_udp_socket_is_up()
+            shared_udp_socket = await self.get_shared_udp_socket()
             return UDPTransport(shared_udp_socket, address, int(port))
 
         try:
@@ -327,7 +340,7 @@ class Uploader:
             return SerialPortTransport.from_url(spec)
         else:
             # It seems like an IP address without a port number, assume 14555
-            shared_udp_socket = await self._ensure_shared_udp_socket_is_up()
+            shared_udp_socket = await self.get_shared_udp_socket()
             return UDPTransport(shared_udp_socket, spec, 14555)
 
     async def _ensure_shared_udp_socket_is_up(self) -> SharedUDPSocket:
@@ -342,7 +355,7 @@ class Uploader:
                 if self._task_group is None:
                     raise RuntimeError("uploader is not in use yet")
 
-                self._shared_udp_socket = SharedUDPSocket("0.0.0.0", 14555)
+                self._shared_udp_socket = SharedUDPSocket("0.0.0.0", 14550)
                 await self._task_group.start(self._shared_udp_socket.run)
 
         return self._shared_udp_socket
