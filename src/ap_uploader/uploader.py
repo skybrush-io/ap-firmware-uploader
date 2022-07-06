@@ -32,6 +32,7 @@ __all__ = (
     "Uploader",
     "UploadStep",
     "UploaderEvent",
+    "UploaderEventHandler",
     "UploaderLifecycleEvent",
     "UploadProgressEvent",
     "LogEvent",
@@ -69,6 +70,16 @@ class UploaderEvent:
     """Base class for events emitted by the uploader task."""
 
     __slots__ = ()
+
+
+UploaderEventHandler = Callable[[str, UploaderEvent], None]
+"""Type alias for functions that take an uploader event and do something with
+it. Used by user interfaces to provide a callback that the uploader can call
+when an event occurs.
+
+The first argument is the source of the event (typically a unique string
+identifying the uploader task), the second is the event itself.
+"""
 
 
 @dataclass
@@ -162,7 +173,7 @@ class Uploader:
     def create_task_group(
         self,
         *,
-        on_event: Callable[[str, UploaderEvent], None],
+        on_event: UploaderEventHandler,
         retries: int = 0,
         max_concurrency: int = 0,
     ) -> "UploaderTaskGroup":
@@ -370,7 +381,7 @@ class UploaderTaskGroup:
     shielded from errors in other tasks.
     """
 
-    _on_event: Callable[[str, UploaderEvent], None]
+    _on_event: UploaderEventHandler
     """Callable that will be called with port identifiers and upload events
     during the upload process. This callback can be used to update an
     attached UI.
@@ -396,7 +407,7 @@ class UploaderTaskGroup:
         self,
         uploader: Uploader,
         *,
-        on_event: Callable[[str, UploaderEvent], None],
+        on_event: UploaderEventHandler,
         retries: int = 0,
         max_concurrency: int = 0,
     ):
