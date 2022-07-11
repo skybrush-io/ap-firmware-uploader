@@ -17,7 +17,7 @@ src = "pyproject.toml"
 search = 'version = "{current_version}"'
 
 [[file]]
-src = "src/flockwave/protocols/flockctrl/version.py"
+src = "src/ap_uploader/version.py"
 version_template = "({major}, {minor}, {patch})"
 search = "__version_info__ = {current_version}"
 
