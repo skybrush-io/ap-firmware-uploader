@@ -6,7 +6,7 @@ from typing import List
 
 from ap_uploader.scanners.fixed import FixedTargetList
 from ap_uploader.scanners.udp import UDPMAVLinkHeartbeatScanner
-from ap_uploader.uploader import LogEvent, Uploader, UploaderEvent, UploaderEventHandler
+from ap_uploader.uploader import LogEvent, Uploader, UploaderEventHandler
 
 from .rich_ui import RichConsoleUI
 

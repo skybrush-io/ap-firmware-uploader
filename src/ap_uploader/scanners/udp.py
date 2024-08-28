@@ -1,7 +1,3 @@
-from anyio import create_udp_socket
-from anyio.abc import SocketAttribute
-from contextlib import aclosing
-from socket import SOL_SOCKET, SO_BROADCAST
 from typing import AsyncIterable, Set
 
 from ap_uploader.network import IPAddressAndPort, SharedUDPSocket

@@ -43,7 +43,7 @@ async def test_send_receive(
 
 
 async def test_send_receive_when_closed(
-    transport_and_listener: Tuple[TCPTransport, TCPListener]
+    transport_and_listener: Tuple[TCPTransport, TCPListener],
 ):
     transport, _ = transport_and_listener
     with raises(ClosedResourceError):

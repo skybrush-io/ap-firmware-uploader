@@ -3,7 +3,6 @@ where the current firmware can be uploaded, based on external events.
 """
 
 from abc import abstractmethod
-from contextlib import AbstractAsyncContextManager
 from typing import AsyncIterable
 
 __all__ = ("Scanner", "UploadTarget")

@@ -206,7 +206,7 @@ class SharedUDPSocket:
         socket: UDPSocket,
         queue: MemoryObjectReceiveStream,
         *,
-        task_status=TASK_STATUS_IGNORED
+        task_status=TASK_STATUS_IGNORED,
     ) -> None:
         """Asynchronous task that writes datagrams to the shared UDP socket,
         according to the requests posted in by callers via ``send()``.

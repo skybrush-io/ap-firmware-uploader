@@ -22,7 +22,7 @@ async def transport_and_peer(udp: UDPSocket) -> Tuple[UDPTransport, UDPSocket]:
 
 
 async def test_send_receive_with_owned_socket(
-    transport_and_peer: Tuple[UDPTransport, UDPSocket]
+    transport_and_peer: Tuple[UDPTransport, UDPSocket],
 ):
     transport, peer = transport_and_peer
 
@@ -76,7 +76,7 @@ async def test_receive_from_other_socket(
 
 
 async def test_send_receive_when_closed(
-    transport_and_peer: Tuple[UDPTransport, UDPSocket]
+    transport_and_peer: Tuple[UDPTransport, UDPSocket],
 ):
     transport, _ = transport_and_peer
     with raises(ClosedResourceError):
@@ -90,7 +90,7 @@ async def test_send_receive_when_closed(
 
 
 async def test_local_port_and_address(
-    transport_and_peer: Tuple[UDPTransport, UDPSocket]
+    transport_and_peer: Tuple[UDPTransport, UDPSocket],
 ):
     transport, _ = transport_and_peer
     async with transport:

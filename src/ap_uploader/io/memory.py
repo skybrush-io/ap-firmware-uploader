@@ -22,7 +22,7 @@ class InMemoryTransport(Transport):
         *,
         _sender: Optional[ObjectSendStream[bytes]] = None,
         _receiver: Optional[ObjectReceiveStream[bytes]] = None,
-        _peer: Optional["InMemoryTransport"] = None
+        _peer: Optional["InMemoryTransport"] = None,
     ):
         """Constructor."""
         if _peer is None:
