@@ -4,26 +4,27 @@ version = "0.1.0"
 description = "Firmware uploader for ArduPilot and PX4 bootloaders"
 authors = [{ name = "Tamas Nepusz", email = "ntamas@gmail.com" }]
 license = "MIT"
-requires-python = ">=3.7,<4.0"
+requires-python = ">=3.9,<4.0"
 dependencies = [
-  "rich>=12.2.0,<13.0",
+  "rich>=14.0.0",
   "pyserial>=3.5,<4.0",
-  "anyio>=3.5.0,<4.0"
+  "anyio>=4.9.0",
 ]
+
 [project.scripts]
 ap-uploader = "ap_uploader.cli.__main__:main"
 
-[tool.poetry]
-packages = [
-    { include = "ap_uploader", from = "src" }
-]
+[tool.hatch.build.targets.wheel]
+packages = ["src/ap_uploader"]
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^7.1.1"
-trio = "^0.20.0"
-pytest-trio = "^0.7.0"
-coverage = { version = "^6.3.2", extras = ["toml"] }
-pytest-cov = "^3.0.0"
+[dependency-groups]
+dev = [
+  "trio>=0.29.0",
+  "pytest>=8.3.5",
+  "pytest-cov>=6.1.1",
+  "pytest-trio>=0.8.0",
+  "coverage[toml]>=7.8.0",
+]
 
 [tool.coverage.paths]
 source = ["src"]
@@ -50,5 +51,5 @@ lint.select = ["B", "C", "E", "F", "W"]
 extend-exclude = ["src/flockwave/server/ext/socketio/vendor"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"

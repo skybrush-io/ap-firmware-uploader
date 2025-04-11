@@ -100,15 +100,18 @@ class SerialPortByteStream(ByteStream):
         task_group = create_task_group()
         await task_group.__aenter__()
 
-        reader_tx, rx = create_memory_object_stream(0, item_type=bytes)
+        reader_tx, rx = create_memory_object_stream[bytes](0)
         task_group.start_soon(
             partial(
-                to_thread.run_sync, self._read_worker, reader_tx.send, cancellable=True
+                to_thread.run_sync,
+                self._read_worker,
+                reader_tx.send,
+                abandon_on_cancel=True,
             )
         )
         reader_stream = BufferedByteReceiveStream(rx)
 
-        writer_tx, rx = create_memory_object_stream(0, item_type=bytes)
+        writer_tx, rx = create_memory_object_stream[bytes](0)
         writer_done = Event()
         task_group.start_soon(
             partial(
@@ -116,7 +119,7 @@ class SerialPortByteStream(ByteStream):
                 self._write_worker,
                 rx.receive,
                 writer_done.set,
-                cancellable=True,
+                abandon_on_cancel=True,
             )
         )
 

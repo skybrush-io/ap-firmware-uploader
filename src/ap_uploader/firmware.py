@@ -132,7 +132,7 @@ class APJFirmware(FirmwareBase):
             length: the number of bytes to read from the stream
         """
         image, metadata = await to_thread.run_sync(
-            self._load_image, fp, cancellable=True
+            self._load_image, fp, abandon_on_cancel=True
         )
         self._process_loaded_image_and_metadata(image, metadata)
 

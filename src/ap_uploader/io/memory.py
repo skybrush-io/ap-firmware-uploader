@@ -26,12 +26,8 @@ class InMemoryTransport(Transport):
     ):
         """Constructor."""
         if _peer is None:
-            sender_tx, sender_rx = create_memory_object_stream(
-                buffer_size, item_type=bytes
-            )
-            receiver_tx, receiver_rx = create_memory_object_stream(
-                buffer_size, item_type=bytes
-            )
+            sender_tx, sender_rx = create_memory_object_stream[bytes](buffer_size)
+            receiver_tx, receiver_rx = create_memory_object_stream[bytes](buffer_size)
 
             self._sender = sender_tx
             self._receiver = receiver_rx
