@@ -1,7 +1,7 @@
 from contextlib import aclosing
 from anyio import create_udp_socket, move_on_after, ClosedResourceError
 from anyio.abc import UDPSocket, SocketAttribute
-from pytest import fixture, raises
+from pytest import fail, fixture, raises
 from typing import Tuple
 
 from ap_uploader.io.udp import UDPTransport
@@ -17,7 +17,7 @@ async def transport_and_peer(udp: UDPSocket) -> Tuple[UDPTransport, UDPSocket]:
     host, port = udp.extra(SocketAttribute.local_address)
     assert isinstance(port, int)
 
-    transport = UDPTransport(host, port)
+    transport = UDPTransport.create(host, port)
     return transport, udp
 
 
@@ -43,7 +43,7 @@ async def test_send_receive_with_borrowed_socket(udp: UDPSocket):
     assert isinstance(port, int)
 
     other_socket = await create_udp_socket(local_host="127.0.0.1")
-    transport = UDPTransport(host, port, socket=other_socket)
+    transport = UDPTransport(socket=other_socket, host=host, port=port)
 
     async with transport:
         assert transport.local_address == other_socket.extra(
@@ -72,7 +72,7 @@ async def test_receive_from_other_socket(
             await other_peer.sendto(b"bacon", "127.0.0.1", transport.local_port)
             with move_on_after(1):
                 await transport.receive()
-                assert False
+                fail("No response received in time")
 
 
 async def test_send_receive_when_closed(
@@ -84,9 +84,9 @@ async def test_send_receive_when_closed(
     with raises(ClosedResourceError):
         await transport.send(b"foo")
     with raises(ClosedResourceError):
-        transport.local_port
+        _ = transport.local_port
     with raises(ClosedResourceError):
-        transport.local_address
+        _ = transport.local_address
 
 
 async def test_local_port_and_address(

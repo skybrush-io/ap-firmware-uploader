@@ -839,7 +839,7 @@ class MAVLink:
                     self.mav20_unpacker.unpack(msgbuf[:headerlen]),
                 )
             except struct.error as emsg:
-                raise MAVError(f"Unable to unpack MAVLink header: {emsg}")
+                raise MAVError(f"Unable to unpack MAVLink header: {emsg}") from None
             msgId = msgIdlow | (msgIdhigh << 16)
             mapkey = msgId
         else:
@@ -852,7 +852,7 @@ class MAVLink:
                 incompat_flags = 0
                 compat_flags = 0
             except struct.error as emsg:
-                raise MAVError(f"Unable to unpack MAVLink header: {emsg}")
+                raise MAVError(f"Unable to unpack MAVLink header: {emsg}") from None
             mapkey = msgId
         if (incompat_flags & MAVLINK_IFLAG_SIGNED) != 0:
             signature_len = MAVLINK_SIGNATURE_BLOCK_LEN
@@ -884,7 +884,7 @@ class MAVLink:
                 self.mav_csum_unpacker.unpack(msgbuf[-(2 + signature_len) :][:2]),
             )
         except struct.error as emsg:
-            raise MAVError(f"Unable to unpack MAVLink CRC: {emsg}")
+            raise MAVError(f"Unable to unpack MAVLink CRC: {emsg}") from None
         crcbuf = bytearray(msgbuf[1 : -(2 + signature_len)])
         if True:  # using CRC extra
             crcbuf.append(crc_extra)
@@ -942,7 +942,7 @@ class MAVLink:
         except struct.error as emsg:
             raise MAVError(
                 f"Unable to unpack MAVLink payload type={message_type} fmt={fmt} payloadLength={len(mbuf)}: {emsg}"
-            )
+            ) from None
 
         tlist: List[Union[bytes, int, float, List[int], List[float]]] = list(t)
         # handle sorted fields
@@ -987,7 +987,7 @@ class MAVLink:
         except Exception as emsg:
             raise MAVError(
                 f"Unable to instantiate MAVLink message of type {message_type}: {emsg}"
-            )
+            ) from None
         m._signed = sig_ok
         if m._signed:
             m._link_id = msgbuf[-13]

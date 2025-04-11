@@ -1,18 +1,22 @@
-[tool.poetry]
+[project]
 name = "ap-uploader"
 version = "0.1.0"
 description = "Firmware uploader for ArduPilot and PX4 bootloaders"
-authors = ["Tamas Nepusz <ntamas@gmail.com>"]
+authors = [{ name = "Tamas Nepusz", email = "ntamas@gmail.com" }]
 license = "MIT"
+requires-python = ">=3.7,<4.0"
+dependencies = [
+  "rich>=12.2.0,<13.0",
+  "pyserial>=3.5,<4.0",
+  "anyio>=3.5.0,<4.0"
+]
+[project.scripts]
+ap-uploader = "ap_uploader.cli.__main__:main"
+
+[tool.poetry]
 packages = [
     { include = "ap_uploader", from = "src" }
 ]
-
-[tool.poetry.dependencies]
-python = "^3.7"
-rich = "^12.2.0"
-pyserial = "^3.5"
-anyio = "^3.5.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.1.1"
@@ -20,9 +24,6 @@ trio = "^0.20.0"
 pytest-trio = "^0.7.0"
 coverage = { version = "^6.3.2", extras = ["toml"] }
 pytest-cov = "^3.0.0"
-
-[tool.poetry.scripts]
-ap-uploader = "ap_uploader.cli.__main__:main"
 
 [tool.coverage.paths]
 source = ["src"]
@@ -42,6 +43,11 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 trio_mode = true
+
+[tool.ruff]
+lint.ignore = ["B905", "C901", "E402", "E501"]
+lint.select = ["B", "C", "E", "F", "W"]
+extend-exclude = ["src/flockwave/server/ext/socketio/vendor"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

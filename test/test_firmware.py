@@ -28,7 +28,7 @@ def test_apj_firmware():
 def test_apj_firmware_without_load():
     fw = APJFirmware()
     with raises(RuntimeError, match="image has not been loaded yet"):
-        fw.image
+        _ = fw.image
 
 
 async def test_load_firmware(tmp_path):
