@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractproperty
+from abc import ABCMeta, abstractmethod
 from anyio import to_thread
 from typing import Any, Dict, IO, Mapping, Optional, Tuple
 
@@ -12,14 +12,16 @@ class Firmware(metaclass=ABCMeta):
     a file in a specific format.
     """
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def board_id(self) -> int:
         """Returns the numeric board ID of the firmware. This indicates which
         board the firmware can be installed on.
         """
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def board_revision(self) -> Optional[int]:
         """Returns the numeric board revision ID of the firmware. This indicates
         which revision of the board the firmware can be installed on. Currently
@@ -27,22 +29,26 @@ class Firmware(metaclass=ABCMeta):
         """
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def crc(self) -> int:
         """Returns the CRC32 checksum of the firmware, without any padding."""
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def image(self) -> bytes:
         """The firmware image as a raw sequence of bytes."""
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def image_size(self) -> int:
         """The length of the image, in bytes."""
         raise NotImplementedError
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def metadata(self) -> Mapping[str, Any]:
         """Returns a Python mapping object that contains the firmware metadata."""
         raise NotImplementedError
