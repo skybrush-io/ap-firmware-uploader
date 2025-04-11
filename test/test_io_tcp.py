@@ -2,7 +2,6 @@ from anyio import create_tcp_listener, BusyResourceError, ClosedResourceError
 from anyio.abc import SocketAttribute, SocketStream
 from anyio.streams.stapled import MultiListener
 from pytest import fixture, raises
-from typing import Tuple
 
 from ap_uploader.io.tcp import TCPTransport
 
@@ -18,7 +17,7 @@ async def listener() -> TCPListener:
 @fixture
 async def transport_and_listener(
     listener: TCPListener,
-) -> Tuple[TCPTransport, TCPListener]:
+) -> tuple[TCPTransport, TCPListener]:
     host, port = listener.extra(SocketAttribute.local_address)
     assert isinstance(port, int)
 
@@ -27,7 +26,7 @@ async def transport_and_listener(
 
 
 async def test_send_receive(
-    transport_and_listener: Tuple[TCPTransport, TCPListener], nursery
+    transport_and_listener: tuple[TCPTransport, TCPListener], nursery
 ):
     transport, listener = transport_and_listener
 
@@ -43,7 +42,7 @@ async def test_send_receive(
 
 
 async def test_send_receive_when_closed(
-    transport_and_listener: Tuple[TCPTransport, TCPListener],
+    transport_and_listener: tuple[TCPTransport, TCPListener],
 ):
     transport, _ = transport_and_listener
     with raises(ClosedResourceError):
@@ -52,7 +51,7 @@ async def test_send_receive_when_closed(
         await transport.send(b"foo")
 
 
-async def test_double_open(transport_and_listener: Tuple[TCPTransport, TCPListener]):
+async def test_double_open(transport_and_listener: tuple[TCPTransport, TCPListener]):
     transport, _ = transport_and_listener
     async with transport:
         with raises(BusyResourceError):

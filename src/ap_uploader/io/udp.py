@@ -1,12 +1,14 @@
 """UDP transport layer for the ArduPilot/PX4 uploader."""
 
+from __future__ import annotations
+
 from anyio import (
     create_udp_socket,
     ClosedResourceError,
 )
 from anyio.abc import SocketAttribute, UDPSocket
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional, Tuple
+from typing import AsyncIterator, Optional
 
 from ap_uploader.network import (
     IPAddressAndPort,
@@ -38,7 +40,7 @@ class UDPTransport(Transport):
 
     @classmethod
     @asynccontextmanager
-    async def create(cls, host: str, port: int) -> AsyncIterator["UDPTransport"]:
+    async def create(cls, host: str, port: int) -> AsyncIterator[UDPTransport]:
         shared_socket = SharedUDPSocket("0.0.0.0", 14550)
         async with shared_socket.use():
             transport = cls(shared_socket, host, port)
@@ -73,7 +75,7 @@ class UDPTransport(Transport):
             await ctx.__aexit__(None, None, None)
 
     @property
-    def local_address(self) -> Tuple[str, int]:
+    def local_address(self) -> tuple[str, int]:
         """The IP address and port that the transport is listening on."""
         return self._shared_socket.local_address
 

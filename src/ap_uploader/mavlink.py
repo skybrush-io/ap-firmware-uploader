@@ -9,7 +9,7 @@ import hashlib
 import json
 import struct
 
-from typing import Callable, ClassVar, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Callable, ClassVar, Optional, Type, Union, cast
 
 WIRE_PROTOCOL_VERSION = "2.0"
 DIALECT = "mavlink"
@@ -116,17 +116,17 @@ class MAVLinkMessage:
 
     id = 0
     msgname = ""
-    field_names: ClassVar[Tuple[str, ...]] = ()
-    ordered_field_names: ClassVar[Tuple[str, ...]] = ()
-    fieldtypes: ClassVar[Tuple[str, ...]] = ()
-    fielddisplays_by_name: Dict[str, str] = {}
-    fieldenums_by_name: Dict[str, str] = {}
-    fieldunits_by_name: Dict[str, str] = {}
+    field_names: ClassVar[tuple[str, ...]] = ()
+    ordered_field_names: ClassVar[tuple[str, ...]] = ()
+    fieldtypes: ClassVar[tuple[str, ...]] = ()
+    fielddisplays_by_name: dict[str, str] = {}
+    fieldenums_by_name: dict[str, str] = {}
+    fieldunits_by_name: dict[str, str] = {}
     format = ""
     native_format = bytearray("", "ascii")
-    orders: List[int] = []
-    lengths: List[int] = []
-    array_lengths: List[int] = []
+    orders: list[int] = []
+    lengths: list[int] = []
+    array_lengths: list[int] = []
     crc_extra = 0
     unpacker = struct.Struct("")
 
@@ -138,7 +138,7 @@ class MAVLinkMessage:
         self._type = name
         self._signed = False
         self._link_id: Optional[int] = None
-        self._instances: Optional[Dict[str, str]] = None
+        self._instances: Optional[dict[str, str]] = None
 
     def format_attr(self, field: str) -> Union[str, float, int]:
         """override field getter"""
@@ -224,8 +224,8 @@ class MAVLinkMessage:
 
         return True
 
-    def to_dict(self) -> Dict[str, Union[str, float, int]]:
-        d: Dict[str, Union[str, float, int]] = {}
+    def to_dict(self) -> dict[str, Union[str, float, int]]:
+        d: dict[str, Union[str, float, int]] = {}
         d["mavpackettype"] = self._type
         for a in self.field_names:
             d[a] = self.format_attr(a)
@@ -315,7 +315,7 @@ MAVLINK_MSG_ID_COMMAND_ACK = 77
 class MAVLinkHeartbeatMessage(MAVLinkMessage):
     id = MAVLINK_MSG_ID_HEARTBEAT
     msgname = "HEARTBEAT"
-    field_names: ClassVar[Tuple[str, ...]] = (
+    field_names: ClassVar[tuple[str, ...]] = (
         "type",
         "autopilot",
         "base_mode",
@@ -323,7 +323,7 @@ class MAVLinkHeartbeatMessage(MAVLinkMessage):
         "system_status",
         "mavlink_version",
     )
-    ordered_field_names: ClassVar[Tuple[str, ...]] = (
+    ordered_field_names: ClassVar[tuple[str, ...]] = (
         "custom_mode",
         "type",
         "autopilot",
@@ -331,7 +331,7 @@ class MAVLinkHeartbeatMessage(MAVLinkMessage):
         "system_status",
         "mavlink_version",
     )
-    fieldtypes: ClassVar[Tuple[str, ...]] = (
+    fieldtypes: ClassVar[tuple[str, ...]] = (
         "uint8_t",
         "uint8_t",
         "uint8_t",
@@ -339,11 +339,11 @@ class MAVLinkHeartbeatMessage(MAVLinkMessage):
         "uint8_t",
         "uint8_t",
     )
-    fielddisplays_by_name: Dict[str, str] = {
+    fielddisplays_by_name: dict[str, str] = {
         "base_mode": "bitmask",
     }
-    fieldenums_by_name: Dict[str, str] = {}
-    fieldunits_by_name: Dict[str, str] = {}
+    fieldenums_by_name: dict[str, str] = {}
+    fieldunits_by_name: dict[str, str] = {}
     format = "<IBBBBB"
     native_format = bytearray("<IBBBBB", "ascii")
     orders = [1, 2, 3, 0, 4, 5]
@@ -389,7 +389,7 @@ class MAVLinkHeartbeatMessage(MAVLinkMessage):
 class MAVLinkCommandLongMessage(MAVLinkMessage):
     id = MAVLINK_MSG_ID_COMMAND_LONG
     msgname = "COMMAND_LONG"
-    field_names: ClassVar[Tuple[str, ...]] = (
+    field_names: ClassVar[tuple[str, ...]] = (
         "target_system",
         "target_component",
         "command",
@@ -402,7 +402,7 @@ class MAVLinkCommandLongMessage(MAVLinkMessage):
         "param6",
         "param7",
     )
-    ordered_field_names: ClassVar[Tuple[str, ...]] = (
+    ordered_field_names: ClassVar[tuple[str, ...]] = (
         "param1",
         "param2",
         "param3",
@@ -415,7 +415,7 @@ class MAVLinkCommandLongMessage(MAVLinkMessage):
         "target_component",
         "confirmation",
     )
-    fieldtypes: ClassVar[Tuple[str, ...]] = (
+    fieldtypes: ClassVar[tuple[str, ...]] = (
         "uint8_t",
         "uint8_t",
         "uint16_t",
@@ -428,11 +428,11 @@ class MAVLinkCommandLongMessage(MAVLinkMessage):
         "float",
         "float",
     )
-    fielddisplays_by_name: Dict[str, str] = {}
-    fieldenums_by_name: Dict[str, str] = {
+    fielddisplays_by_name: dict[str, str] = {}
+    fieldenums_by_name: dict[str, str] = {
         "command": "MAV_CMD",
     }
-    fieldunits_by_name: Dict[str, str] = {}
+    fieldunits_by_name: dict[str, str] = {}
     format = "<fffffffHBBB"
     native_format = bytearray("<fffffffHBBB", "ascii")
     orders = [8, 9, 7, 10, 0, 1, 2, 3, 4, 5, 6]
@@ -493,7 +493,7 @@ class MAVLinkCommandLongMessage(MAVLinkMessage):
 class MAVLinkCommandACKMessage(MAVLinkMessage):
     id = MAVLINK_MSG_ID_COMMAND_ACK
     msgname = "COMMAND_ACK"
-    field_names: ClassVar[Tuple[str, ...]] = (
+    field_names: ClassVar[tuple[str, ...]] = (
         "command",
         "result",
         "progress",
@@ -501,7 +501,7 @@ class MAVLinkCommandACKMessage(MAVLinkMessage):
         "target_system",
         "target_component",
     )
-    ordered_field_names: ClassVar[Tuple[str, ...]] = (
+    ordered_field_names: ClassVar[tuple[str, ...]] = (
         "command",
         "result",
         "progress",
@@ -509,7 +509,7 @@ class MAVLinkCommandACKMessage(MAVLinkMessage):
         "target_system",
         "target_component",
     )
-    fieldtypes: ClassVar[Tuple[str, ...]] = (
+    fieldtypes: ClassVar[tuple[str, ...]] = (
         "uint16_t",
         "uint8_t",
         "uint8_t",
@@ -517,12 +517,12 @@ class MAVLinkCommandACKMessage(MAVLinkMessage):
         "uint8_t",
         "uint8_t",
     )
-    fielddisplays_by_name: Dict[str, str] = {}
-    fieldenums_by_name: Dict[str, str] = {
+    fielddisplays_by_name: dict[str, str] = {}
+    fieldenums_by_name: dict[str, str] = {
         "command": "MAV_CMD",
         "result": "MAV_RESULT",
     }
-    fieldunits_by_name: Dict[str, str] = {}
+    fieldunits_by_name: dict[str, str] = {}
     format = "<HBBiBB"
     native_format = bytearray("<HBBiBB", "ascii")
     orders = [0, 1, 2, 3, 4, 5]
@@ -588,7 +588,7 @@ def nulstr_to_str(s: str):
 class MAVLinkBadData(MAVLinkMessage):
     """A piece of bad data in a MAVLink stream."""
 
-    field_names: ClassVar[Tuple[str, ...]] = ("data", "reason")
+    field_names: ClassVar[tuple[str, ...]] = ("data", "reason")
 
     def __init__(self, data: Union[bytearray, bytes], reason: str) -> None:
         super().__init__(MAVLINK_MSG_ID_BAD_DATA, "BAD_DATA")
@@ -607,7 +607,7 @@ class MAVLinkUnknownMessage(MAVLinkMessage):
     a message that we don't have in the XML used when built
     """
 
-    field_names: ClassVar[Tuple[str, ...]] = ("data",)
+    field_names: ClassVar[tuple[str, ...]] = ("data",)
 
     def __init__(self, msg_id: int, data: Union[bytearray, bytes]) -> None:
         super().__init__(MAVLINK_MSG_ID_UNKNOWN, f"UNKNOWN_{msg_id}")
@@ -631,7 +631,7 @@ class MAVLinkSigning:
         self.link_id = 0
         self.sign_outgoing = False
         self.allow_unsigned_callback: Optional[Callable[["MAVLink", int], bool]] = None
-        self.stream_timestamps: Dict[Tuple[int, int, int], int] = {}
+        self.stream_timestamps: dict[tuple[int, int, int], int] = {}
         self.sig_count = 0
         self.badsig_count = 0
         self.goodsig_count = 0
@@ -721,7 +721,7 @@ class MAVLink:
         if self.buf_len() >= 3:
             sbuf = self.buf[self.buf_index : 3 + self.buf_index]
             (magic, self.expected_length, incompat_flags) = cast(
-                Tuple[int, int, int],
+                tuple[int, int, int],
                 self.mav20_h3_unpacker.unpack(sbuf),
             )
             if magic == PROTOCOL_MARKER_V2 and (incompat_flags & MAVLINK_IFLAG_SIGNED):
@@ -758,7 +758,7 @@ class MAVLink:
             return m
         return None
 
-    def parse_buffer(self, s: bytes) -> Optional[List[MAVLinkMessage]]:
+    def parse_buffer(self, s: bytes) -> Optional[list[MAVLinkMessage]]:
         """input some data bytes, possibly returning a list of new messages"""
         m = self.parse_char(s)
         if m is None:
@@ -783,7 +783,7 @@ class MAVLink:
         timestamp_buf = msgbuf[-12:-6]
         link_id = msgbuf[-13]
         (tlow, thigh) = cast(
-            Tuple[int, int],
+            tuple[int, int],
             self.mav_sign_unpacker.unpack(timestamp_buf),
         )
         timestamp = tlow + (thigh << 32)
@@ -835,7 +835,7 @@ class MAVLink:
                     msgIdlow,
                     msgIdhigh,
                 ) = cast(
-                    Tuple[bytes, int, int, int, int, int, int, int, int],
+                    tuple[bytes, int, int, int, int, int, int, int, int],
                     self.mav20_unpacker.unpack(msgbuf[:headerlen]),
                 )
             except struct.error as emsg:
@@ -846,7 +846,7 @@ class MAVLink:
             headerlen = 6
             try:
                 magic, mlen, seq, source_system, source_component, msgId = cast(
-                    Tuple[bytes, int, int, int, int, int],
+                    tuple[bytes, int, int, int, int, int],
                     self.mav10_unpacker.unpack(msgbuf[:headerlen]),
                 )
                 incompat_flags = 0
@@ -880,7 +880,7 @@ class MAVLink:
         # decode the checksum
         try:
             (crc,) = cast(
-                Tuple[int],
+                tuple[int],
                 self.mav_csum_unpacker.unpack(msgbuf[-(2 + signature_len) :][:2]),
             )
         except struct.error as emsg:
@@ -936,7 +936,7 @@ class MAVLink:
         mbuf = mbuf[:csize]
         try:
             t = cast(
-                Tuple[Union[bytes, int, float], ...],
+                tuple[Union[bytes, int, float], ...],
                 message_type.unpacker.unpack(mbuf),
             )
         except struct.error as emsg:
@@ -944,7 +944,7 @@ class MAVLink:
                 f"Unable to unpack MAVLink payload type={message_type} fmt={fmt} payloadLength={len(mbuf)}: {emsg}"
             ) from None
 
-        tlist: List[Union[bytes, int, float, List[int], List[float]]] = list(t)
+        tlist: list[Union[bytes, int, float, list[int], list[float]]] = list(t)
         # handle sorted fields
         if True:
             tlist_saved = list(t)
@@ -965,19 +965,19 @@ class MAVLink:
                     else:
                         tlist.append(
                             cast(
-                                Union[List[float], List[int]],
+                                Union[list[float], list[int]],
                                 tlist_saved[tip : (tip + L)],
                             )
                         )
 
         # terminate any strings
-        tlist_str: List[Union[str, int, float, List[int], List[float]]] = []
+        tlist_str: list[Union[str, int, float, list[int], list[float]]] = []
         for i in range(0, len(tlist)):
             if message_type.fieldtypes[i] == "char":
                 tlist_str.append(nulstr_to_str(to_string(cast(bytes, tlist[i]))))
             else:
                 tlist_str.append(
-                    cast(Union[int, float, List[float], List[int]], tlist[i]),
+                    cast(Union[int, float, list[float], list[int]], tlist[i]),
                 )
         msg_tuple = tuple(tlist_str)
         try:

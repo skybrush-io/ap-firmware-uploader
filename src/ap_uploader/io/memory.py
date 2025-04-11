@@ -1,5 +1,7 @@
 """In-memory transport, mostly for testing purposes."""
 
+from __future__ import annotations
+
 from anyio import create_memory_object_stream
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
 from typing import Optional
@@ -22,7 +24,7 @@ class InMemoryTransport(Transport):
         *,
         _sender: Optional[ObjectSendStream[bytes]] = None,
         _receiver: Optional[ObjectReceiveStream[bytes]] = None,
-        _peer: Optional["InMemoryTransport"] = None,
+        _peer: Optional[InMemoryTransport] = None,
     ):
         """Constructor."""
         if _peer is None:

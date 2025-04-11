@@ -1,7 +1,6 @@
 from anyio import BusyResourceError, ClosedResourceError, EndOfStream
 from pytest import fixture, raises
 from random import randint
-from typing import List
 
 from ap_uploader.io.serial import SerialPortByteStream, SerialPortTransport
 
@@ -81,7 +80,7 @@ async def test_serial_port_transport(nursery, transport: SerialPortTransport):
         await transport.aclose()
 
     async def consumer():
-        read: List[bytes] = []
+        read: list[bytes] = []
         while True:
             try:
                 read.append(await transport.receive())

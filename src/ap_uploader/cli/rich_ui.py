@@ -1,9 +1,11 @@
 """User interface for the command-line uploader based on Rich."""
 
+from __future__ import annotations
+
 import logging
 
 from contextlib import AbstractContextManager
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from ap_uploader.uploader import (
     CRCMismatchEvent,
@@ -30,7 +32,7 @@ class RichConsoleUI(AbstractContextManager):
     _progress: "Progress"
     """Progress widget that the console UI shows."""
 
-    _event_source_to_task_id: Dict[str, "TaskID"]
+    _event_source_to_task_id: dict[str, TaskID]
     """Mapping from upload target names to the corresponding task IDs in the
     progress widget.
     """

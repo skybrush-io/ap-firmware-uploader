@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from anyio import (
     create_memory_object_stream,
     create_task_group,
@@ -11,10 +13,10 @@ from anyio.abc import SocketAttribute, UDPSocket
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 from contextlib import aclosing, asynccontextmanager
 from socket import SOL_SOCKET, SO_BROADCAST
-from typing import AsyncIterator, Dict, Optional, Tuple
+from typing import AsyncIterator, Optional
 
 
-IPAddressAndPort = Tuple[str, int]
+IPAddressAndPort = tuple[str, int]
 """Type alias for a pair of an IP address and a port."""
 
 
@@ -34,7 +36,7 @@ class SharedUDPSocket:
     _socket: Optional[UDPSocket]
     """The UDP socket wrapped by the wrapper class."""
 
-    _subscriptions: Dict[IPAddressAndPort, "SharedUDPSocketSubscription"]
+    _subscriptions: dict[IPAddressAndPort, SharedUDPSocketSubscription]
     """Dictionary mapping IP address and port pairs to the corresponding
     subscription objects. Each subscription object holds a size-bounded queue
     with the incoming datagrams from that IP address and port.
@@ -46,7 +48,7 @@ class SharedUDPSocket:
     """
 
     _unmatched_queue: Optional[
-        MemoryObjectSendStream[Tuple[bytes, IPAddressAndPort]]
+        MemoryObjectSendStream[tuple[bytes, IPAddressAndPort]]
     ] = None
     """Queue in which the unmatched packets are placed by the shared UDP socket."""
 
@@ -115,7 +117,7 @@ class SharedUDPSocket:
     @asynccontextmanager
     async def subscribed_to(
         self, peer: IPAddressAndPort
-    ) -> AsyncIterator["SharedUDPSocketSubscription"]:
+    ) -> AsyncIterator[SharedUDPSocketSubscription]:
         """Async context manager that subscribes to datagrams coming from the
         given IP address and port pair while the execution is within the
         context.
@@ -138,7 +140,7 @@ class SharedUDPSocket:
     @asynccontextmanager
     async def unmatched_handler(
         self, buffer_size: int = 256
-    ) -> AsyncIterator[MemoryObjectReceiveStream[Tuple[bytes, IPAddressAndPort]]]:
+    ) -> AsyncIterator[MemoryObjectReceiveStream[tuple[bytes, IPAddressAndPort]]]:
         """Async context manager that registers a handler for unmatched datagrams
         while the execution is within the context, and returns a queue in which
         the unmatched datagrams can be received along with their senders.

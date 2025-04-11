@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from anyio import Lock, fail_after
 from contextlib import AbstractAsyncContextManager
-from typing import Any, List, Optional, TypeVar, TYPE_CHECKING
+from typing import Any, Optional, TypeVar, TYPE_CHECKING
 
 from .io.base import Transport
 from .protocol import (
@@ -31,7 +33,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
     this connection object.
     """
 
-    _mavlink: Optional["MAVLink"] = None
+    _mavlink: Optional[MAVLink] = None
     """Local MAVLink protocol instance, needed if we have to send a MAVLink
     reboot command to ensure that the other end is in the bootloader."""
 
@@ -125,7 +127,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
 
     async def get_serial_number(self) -> bytes:
         """Returns the serial number of the chip from the bootloader."""
-        result: List[int] = []
+        result: list[int] = []
         for address in range(0, 12, 4):
             word = await self._process_command(
                 Command.read_word_from_serial_number_area(address)

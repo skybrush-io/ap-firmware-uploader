@@ -2,7 +2,6 @@ import logging
 
 from argparse import ArgumentParser
 from contextlib import aclosing, AsyncExitStack
-from typing import List
 
 from ap_uploader.scanners.fixed import FixedTargetList
 from ap_uploader.scanners.udp import UDPMAVLinkHeartbeatScanner
@@ -39,7 +38,7 @@ def create_parser() -> ArgumentParser:
 
 
 async def uploader(options, on_event: UploaderEventHandler) -> None:
-    ports: List[str] = options.port
+    ports: list[str] = options.port
     max_concurrency: int = max(options.max_concurrency, 0)
     retries: int = max(options.retries, 0)
 

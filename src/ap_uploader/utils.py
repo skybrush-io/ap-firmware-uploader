@@ -1,7 +1,7 @@
 from array import array
 from glob import glob
 from platform import system, uname
-from typing import Iterable, List, Optional, Sequence, TypeVar
+from typing import Iterable, Optional, Sequence, TypeVar
 
 __all__ = ("is_cygwin", "is_linux", "is_macos", "is_wsl", "get_serial_port_candidates")
 
@@ -32,7 +32,7 @@ def _get_default_serial_port_candidates() -> Iterable[str]:
     """Returns the default list of serial ports to consider as ArduPilot/PX4
     devices on the current platform.
     """
-    candidates: List[str] = [
+    candidates: list[str] = [
         "/dev/serial/by-id/usb-Ardu*",
         "/dev/serial/by-id/usb-3D*",
         "/dev/serial/by-id/usb-APM*",
@@ -135,7 +135,7 @@ def get_serial_port_candidates(seed: Optional[Iterable[str]] = None) -> Iterable
         paths or identifiers of serial ports to try on the current platform
     """
     patterns = list(seed or ())
-    port_list: List[str]
+    port_list: list[str]
 
     # Use glob patterns on Linux, macOS and Cygwin to support wildcard ports.
     # This allows the use of /dev/serial/by-id/usb-ArduPilot on Linux, which

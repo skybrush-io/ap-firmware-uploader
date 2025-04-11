@@ -1,4 +1,4 @@
-from typing import AsyncIterable, Set
+from typing import AsyncIterable
 
 from ap_uploader.network import IPAddressAndPort, SharedUDPSocket
 
@@ -19,7 +19,7 @@ class UDPMAVLinkHeartbeatScanner(Scanner):
         self._socket = socket
 
     async def run(self) -> AsyncIterable[UploadTarget]:
-        yielded: Set[IPAddressAndPort] = set()
+        yielded: set[IPAddressAndPort] = set()
 
         self._socket.allow_broadcasts()
 

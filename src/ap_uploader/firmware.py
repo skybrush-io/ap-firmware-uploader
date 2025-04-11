@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from anyio import to_thread
-from typing import Any, Dict, IO, Mapping, Optional, Tuple
+from typing import Any, IO, Mapping, Optional
 
 from .utils import crc32
 
@@ -63,7 +63,7 @@ class FirmwareBase(Firmware):
     _image: Optional[bytes] = None
     """The firmware image; ``None`` if it has not been loaded yet."""
 
-    _metadata: Dict[str, Any]
+    _metadata: dict[str, Any]
     """The metadata of the image."""
 
     def __init__(self) -> None:
@@ -117,7 +117,7 @@ class FirmwareBase(Firmware):
         self._metadata.update(**kwds)
 
     def _process_loaded_image_and_metadata(
-        self, image: bytes, metadata: Dict[str, Any]
+        self, image: bytes, metadata: dict[str, Any]
     ) -> None:
         self._clear_metadata()
         self._set_image(image)
@@ -153,12 +153,12 @@ class APJFirmware(FirmwareBase):
         image, metadata = self._load_image(fp)
         self._process_loaded_image_and_metadata(image, metadata)
 
-    def _load_image(self, fp: IO[bytes]) -> Tuple[bytes, Dict[str, Any]]:
+    def _load_image(self, fp: IO[bytes]) -> tuple[bytes, dict[str, Any]]:
         from base64 import b64decode
         from json import load
         from zlib import decompress
 
-        obj: Dict[str, Any] = load(fp)
+        obj: dict[str, Any] = load(fp)
         image = decompress(b64decode(obj.pop("image")))
 
         return image, obj
