@@ -6,16 +6,16 @@ Firmware uploader script for ArduPilot and PX4 bootloaders.
 Installation
 ------------
 
-We use `poetry` to manage a Python virtual environment that will contain all
-the dependencies. Install `poetry` first if you don't have it yet, then follow
+We use `uv` to manage a Python virtual environment that will contain all
+the dependencies. Install `uv` first if you don't have it yet, then follow
 these steps:
 
 1. Clone this repository.
 
-2. Run `poetry install` to create a virtualenv and install all the dependencies
+2. Run `uv sync` to create a virtualenv and install all the dependencies
    in it.
 
-3. Run `poetry run ap-uploader -p 192.168.4.1 firmware.apj` to upload the
+3. Run `uv run ap-uploader -p 192.168.4.1 firmware.apj` to upload the
    given firmware to a drone that is accessible via UDP packets on 192.168.4.1.
 
 License
