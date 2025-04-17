@@ -1,5 +1,6 @@
 import errno
 import logging
+import sys
 
 from anyio import (
     create_task_group,
@@ -15,7 +16,15 @@ from enum import Enum
 from functools import partial
 from ipaddress import ip_address
 from itertools import repeat
-from typing import Any, AsyncIterable, AsyncIterator, Callable, Optional, TypeVar
+from typing import (
+    Any,
+    AsyncIterable,
+    AsyncIterator,
+    Callable,
+    Optional,
+    Sequence,
+    TypeVar,
+)
 
 from .connection import BootloaderConnection
 from .errors import NotSupportedError
@@ -27,6 +36,8 @@ from .protocol import PROG_MULTI_MAX_PAYLOAD_LENGTH
 from .scanners.base import Scanner, UploadTarget
 from .utils import crc32
 
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
 
 __all__ = (
     "Uploader",
@@ -440,33 +451,55 @@ class UploaderTaskGroup:
                     await self._limiter.acquire()
                     acquired = True
                 await self._uploader.upload_firmware(port, on_event=on_event)
+            except ExceptionGroup as ex:
+                message, should_retry = self._handle_exceptions_during_upload(
+                    ex.exceptions
+                )
             except Exception as ex:
-                if isinstance(ex, TimeoutError):
-                    message = "Upload timed out"
-                elif isinstance(ex, RuntimeError):
-                    message = f"Upload failed: {ex}"
-                elif isinstance(ex, OSError):
-                    message = f"Upload failed: {ex.strerror}"
-                else:
-                    message = f"Upload failed: {ex!r}"
-
-                should_retry = True
-                if isinstance(ex, OSError) and ex.errno in (
-                    errno.ENOENT,
-                    errno.EADDRINUSE,
-                ):
-                    should_retry = False
-
-                if not should_retry:
-                    attempt = self._retries
-
-                if attempt < self._retries:
-                    on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
-                else:
-                    on_event(LogEvent(logging.ERROR, message))
-                attempt += 1
+                message, should_retry = self._handle_exceptions_during_upload([ex])
             else:
                 break
             finally:
                 if acquired and self._limiter:
                     self._limiter.release()
+
+            # We get here only if there was an exception during the upload
+            if not should_retry:
+                attempt = self._retries
+
+            if attempt < self._retries:
+                on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
+            else:
+                on_event(LogEvent(logging.ERROR, message))
+
+            attempt += 1
+
+    def _handle_exceptions_during_upload(self, exceptions: Sequence[Exception]):
+        should_retry = True
+        reasons: list[str] = []
+        timed_out = False
+
+        for exc in exceptions:
+            if isinstance(exc, TimeoutError):
+                timed_out = True
+            elif isinstance(exc, RuntimeError):
+                reasons.append(str(exc))
+            elif isinstance(exc, OSError):
+                reasons.append(exc.strerror or str(exc))
+            else:
+                reasons.append(repr(exc))
+
+            if isinstance(exc, OSError) and exc.errno in (
+                errno.ENOENT,
+                errno.EADDRINUSE,
+            ):
+                should_retry = False
+
+        if reasons:
+            message = f"Upload failed: {', '.join(reasons)}"
+        elif timed_out:
+            message = "Upload timed out"
+        else:
+            message = "Upload failed"
+
+        return message, should_retry
