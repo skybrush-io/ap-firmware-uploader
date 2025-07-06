@@ -5,17 +5,10 @@ description = "Firmware uploader for ArduPilot and PX4 bootloaders"
 authors = [{ name = "Tamas Nepusz", email = "ntamas@gmail.com" }]
 license = "MIT"
 requires-python = ">=3.9,<4.0"
-dependencies = [
-  "rich>=14.0.0",
-  "pyserial>=3.5,<4.0",
-  "anyio>=4.9.0",
-]
+dependencies = ["rich>=14.0.0", "pyserial>=3.5,<4.0", "anyio>=4.9.0"]
 
 [project.scripts]
 ap-uploader = "ap_uploader.cli.__main__:main"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/ap_uploader"]
 
 [dependency-groups]
 dev = [
@@ -39,7 +32,7 @@ show_missing = true
 exclude_lines = [
   "raise NotImplementedError",
   "def __repr__",
-  "pragma: no cover"
+  "pragma: no cover",
 ]
 
 [tool.pytest.ini_options]
@@ -51,5 +44,5 @@ lint.select = ["B", "C", "E", "F", "W"]
 extend-exclude = ["src/flockwave/server/ext/socketio/vendor"]
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build"]
+build-backend = "uv_build"
