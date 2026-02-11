@@ -13,6 +13,7 @@ from typing import (
     AsyncIterator,
     Callable,
     Sequence,
+    TypeAlias,
     TypeVar,
 )
 
@@ -82,7 +83,7 @@ class UploaderEvent:
     __slots__ = ()
 
 
-UploaderEventHandler = Callable[[str, UploaderEvent], None]
+UploaderEventHandler: TypeAlias = Callable[[str, UploaderEvent], None]
 """Type alias for functions that take an uploader event and do something with
 it. Used by user interfaces to provide a callback that the uploader can call
 when an event occurs.

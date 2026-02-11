@@ -3,11 +3,11 @@ where the current firmware can be uploaded, based on external events.
 """
 
 from abc import ABC, abstractmethod
-from typing import AsyncIterable
+from typing import AsyncIterable, TypeAlias
 
 __all__ = ("Scanner", "UploadTarget")
 
-UploadTarget = str
+UploadTarget: TypeAlias = str
 
 
 class Scanner(ABC):

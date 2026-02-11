@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import aclosing, asynccontextmanager
 from socket import SO_BROADCAST, SOL_SOCKET
-from typing import AsyncIterator
+from typing import AsyncIterator, TypeAlias
 
 from anyio import (
     TASK_STATUS_IGNORED,
@@ -16,7 +16,7 @@ from anyio import (
 from anyio.abc import SocketAttribute, UDPSocket
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
 
-IPAddressAndPort = tuple[str, int]
+IPAddressAndPort: TypeAlias = tuple[str, int]
 """Type alias for a pair of an IP address and a port."""
 
 
