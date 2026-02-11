@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
+from typing import IO, Any, Mapping
+
 from anyio import to_thread
-from typing import Any, IO, Mapping, Optional
 
 from .utils import crc32
 
@@ -22,7 +23,7 @@ class Firmware(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def board_revision(self) -> Optional[int]:
+    def board_revision(self) -> int | None:
         """Returns the numeric board revision ID of the firmware. This indicates
         which revision of the board the firmware can be installed on. Currently
         used for informational purposes only.
@@ -57,10 +58,10 @@ class Firmware(metaclass=ABCMeta):
 class FirmwareBase(Firmware):
     """Base implementation of the Firmware_ interface."""
 
-    _crc: Optional[int] = None
+    _crc: int | None = None
     """Cached CRC of the firmware."""
 
-    _image: Optional[bytes] = None
+    _image: bytes | None = None
     """The firmware image; ``None`` if it has not been loaded yet."""
 
     _metadata: dict[str, Any]
@@ -74,7 +75,7 @@ class FirmwareBase(Firmware):
         return int(self.metadata["board_id"])
 
     @property
-    def board_revision(self) -> Optional[int]:
+    def board_revision(self) -> int | None:
         rev = self.metadata.get("board_revision")
         return None if rev is None else int(rev)
 

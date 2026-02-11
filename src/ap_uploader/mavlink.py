@@ -8,8 +8,7 @@ the Python syntax.
 import hashlib
 import json
 import struct
-
-from typing import Callable, ClassVar, Optional, Type, Union, cast
+from typing import Callable, ClassVar, Type, Union, cast
 
 WIRE_PROTOCOL_VERSION = "2.0"
 DIALECT = "mavlink"
@@ -134,11 +133,11 @@ class MAVLinkMessage:
         self._header = MAVLinkHeader(msg_id)
         self._payload: Union[bytes, bytearray, None] = None
         self._msgbuf: Union[bytes, bytearray, None] = None
-        self._crc: Optional[int] = None
+        self._crc: int | None = None
         self._type = name
         self._signed = False
-        self._link_id: Optional[int] = None
-        self._instances: Optional[dict[str, str]] = None
+        self._link_id: int | None = None
+        self._instances: dict[str, str] | None = None
 
     def format_attr(self, field: str) -> Union[str, float, int]:
         """override field getter"""
@@ -163,7 +162,7 @@ class MAVLinkMessage:
     def get_payload(self) -> Union[bytes, bytearray, None]:
         return self._payload
 
-    def get_crc(self) -> Optional[int]:
+    def get_crc(self) -> int | None:
         return self._crc
 
     def get_type(self) -> str:
@@ -184,7 +183,7 @@ class MAVLinkMessage:
     def get_signed(self) -> bool:
         return self._signed
 
-    def get_link_id(self) -> Optional[int]:
+    def get_link_id(self) -> int | None:
         return self._link_id
 
     def __str__(self) -> str:
@@ -626,11 +625,11 @@ class MAVLinkSigning:
     """MAVLink signing state class"""
 
     def __init__(self) -> None:
-        self.secret_key: Optional[bytes] = None
+        self.secret_key: bytes | None = None
         self.timestamp = 0
         self.link_id = 0
         self.sign_outgoing = False
-        self.allow_unsigned_callback: Optional[Callable[["MAVLink", int], bool]] = None
+        self.allow_unsigned_callback: Callable[["MAVLink", int], bool] | None = None
         self.stream_timestamps: dict[tuple[int, int, int], int] = {}
         self.sig_count = 0
         self.badsig_count = 0
@@ -680,7 +679,7 @@ class MAVLink:
         self.seq = (self.seq + 1) % 256
         return buf
 
-    def parse_char(self, c: bytes) -> Optional[MAVLinkMessage]:
+    def parse_char(self, c: bytes) -> MAVLinkMessage | None:
         """input some data bytes, possibly returning a new message"""
         self.buf.extend(c)
 
@@ -694,7 +693,7 @@ class MAVLink:
 
         return m
 
-    def _parse_char_legacy(self) -> Optional[MAVLinkMessage]:
+    def _parse_char_legacy(self) -> MAVLinkMessage | None:
         """input some data bytes, possibly returning a new message (uses no native code)"""
         m: MAVLinkMessage
 
@@ -758,7 +757,7 @@ class MAVLink:
             return m
         return None
 
-    def parse_buffer(self, s: bytes) -> Optional[list[MAVLinkMessage]]:
+    def parse_buffer(self, s: bytes) -> list[MAVLinkMessage] | None:
         """input some data bytes, possibly returning a list of new messages"""
         m = self.parse_char(s)
         if m is None:

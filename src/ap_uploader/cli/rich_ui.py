@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import logging
-
 from contextlib import AbstractContextManager
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ap_uploader.uploader import (
     CRCMismatchEvent,
     LogEvent,
-    UploadStep,
     UploaderEvent,
     UploaderLifecycleEvent,
     UploadProgressEvent,
+    UploadStep,
     UploadStepEvent,
 )
 
@@ -93,7 +92,7 @@ class RichConsoleUI(AbstractContextManager):
             self.log(event.message, sender=sender, level=event.level)
 
     def log(
-        self, message: str, *, sender: Optional[str] = None, level: int = logging.INFO
+        self, message: str, *, sender: str | None = None, level: int = logging.INFO
     ):
         if level >= logging.ERROR:
             sign = "[red bold]X[/red bold]"

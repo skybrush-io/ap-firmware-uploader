@@ -1,24 +1,25 @@
 """Serial port transport layer for the ArduPilot/PX4 uploader."""
 
+from functools import partial
+from typing import Any, Callable, Coroutine, TypeVar
+
 from anyio import (
-    create_memory_object_stream,
-    create_task_group,
-    from_thread,
-    move_on_after,
-    to_thread,
     BusyResourceError,
     CancelScope,
     ClosedResourceError,
     EndOfStream,
     Event,
+    create_memory_object_stream,
+    create_task_group,
+    from_thread,
+    move_on_after,
+    to_thread,
 )
 from anyio.abc import ByteStream, TaskGroup
 from anyio.streams.buffered import BufferedByteReceiveStream
 from anyio.streams.memory import MemoryObjectSendStream
-from functools import partial
 from serial import Serial, serial_for_url
 from serial.serialutil import PortNotOpenError, SerialException
-from typing import Any, Callable, Coroutine, Optional, TypeVar
 
 from .base import Transport
 
@@ -41,26 +42,26 @@ class SerialPortByteStream(ByteStream):
     _port: Serial
     """The ``pyserial`` serial port that this object wraps."""
 
-    _reader_stream: Optional[BufferedByteReceiveStream] = None
+    _reader_stream: BufferedByteReceiveStream | None = None
     """A receive stream that will yield the bytes received from the serial
     port. ``None`` if the byte stream is not open.
     """
 
-    _reader_thread_queue: Optional[MemoryObjectSendStream] = None
+    _reader_thread_queue: MemoryObjectSendStream | None = None
     """The sending endpoint of the queue used by the reader thread. This is
     used to signal the thread to stop when needed. Must be called when we are
     not interested in any data received from the serial port any more.
     """
 
-    _task_group: Optional[TaskGroup] = None
+    _task_group: TaskGroup | None = None
     """The ``anyio`` task group that encapsulates the reader and writer
     worker task; ``None`` if the byte stream is not open.
     """
 
-    _writer_done: Optional[Event] = None
+    _writer_done: Event | None = None
     """Event that the writer thread will set when it is about to terminate."""
 
-    _writer_thread_queue: Optional[MemoryObjectSendStream] = None
+    _writer_thread_queue: MemoryObjectSendStream | None = None
     """The sending endpoint of the queue used by the worker thread. This is
     used to signal the thread to stop when needed. Must be called when we know
     we will not send any more data through the serial port.

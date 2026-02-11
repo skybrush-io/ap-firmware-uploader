@@ -1,15 +1,6 @@
 import errno
 import logging
 import sys
-
-from anyio import (
-    create_task_group,
-    get_cancelled_exc_class,
-    Lock,
-    CapacityLimiter,
-    to_thread,
-)
-from anyio.abc import TaskGroup
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from enum import Enum
@@ -21,17 +12,25 @@ from typing import (
     AsyncIterable,
     AsyncIterator,
     Callable,
-    Optional,
     Sequence,
     TypeVar,
 )
+
+from anyio import (
+    CapacityLimiter,
+    Lock,
+    create_task_group,
+    get_cancelled_exc_class,
+    to_thread,
+)
+from anyio.abc import TaskGroup
 
 from .connection import BootloaderConnection
 from .errors import NotSupportedError
 from .firmware import Firmware, load_firmware
 from .io.base import Transport
-from .io.udp import SharedUDPSocket, UDPTransport
 from .io.serial import SerialPortTransport
+from .io.udp import SharedUDPSocket, UDPTransport
 from .protocol import PROG_MULTI_MAX_PAYLOAD_LENGTH
 from .scanners.base import Scanner, UploadTarget
 from .utils import crc32
@@ -101,10 +100,10 @@ class UploaderLifecycleEvent(UploaderEvent):
     type: str
     """The type of the event."""
 
-    success: Optional[bool] = None
+    success: bool | None = None
     """Whether the upload was successful; only valid for "finished" events."""
 
-    cancelled: Optional[bool] = None
+    cancelled: bool | None = None
     """Whether the upload was cancelled; only valid for "finished" events."""
 
 
@@ -162,12 +161,12 @@ C = TypeVar("C", bound="Uploader")
 
 
 class Uploader:
-    _firmware: Optional[Firmware] = None
+    _firmware: Firmware | None = None
     """The firmware that the uploader will upload; ``None`` if it is not loaded
     yet.
     """
 
-    _shared_udp_socket: Optional[SharedUDPSocket] = None
+    _shared_udp_socket: SharedUDPSocket | None = None
     """A shared UDP socket that will be used by the uploader tasks spawned from
     this uploader to communicate with upload targets. Constructed on-demand
     when the first UDP socket is needed.
@@ -175,7 +174,7 @@ class Uploader:
 
     _shared_udp_socket_lock: Lock
 
-    _task_group: Optional[TaskGroup] = None
+    _task_group: TaskGroup | None = None
     """The task group used privately by the uploader to run its private tasks."""
 
     def __init__(self):
@@ -276,7 +275,7 @@ class Uploader:
                 # program_bytes() call raises a TimeoutError because in this
                 # case we don't know whether our packet reached the bootloader
                 # or not
-                write_pointer: Optional[int] = 0
+                write_pointer: int | None = 0
                 total_bytes = len(firmware.image)
                 while write_pointer is None or write_pointer < total_bytes:
                     if write_pointer is None:
@@ -398,7 +397,7 @@ class UploaderTaskGroup:
     attached UI.
     """
 
-    _limiter: Optional[CapacityLimiter] = None
+    _limiter: CapacityLimiter | None = None
     """An optional capacity limiter that can be used to limit the maximum
     number of concurrent upload tasks.
     """
@@ -435,7 +434,7 @@ class UploaderTaskGroup:
         await self._task_group.__aenter__()
         return self
 
-    async def __aexit__(self, *args: Any) -> Optional[bool]:
+    async def __aexit__(self, *args: Any) -> bool | None:
         return await self._task_group.__aexit__(*args)
 
     def start_upload_to(self, port: str) -> None:

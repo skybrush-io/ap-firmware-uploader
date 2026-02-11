@@ -16,7 +16,7 @@ async def transport_and_peer(udp: UDPSocket) -> tuple[UDPTransport, UDPSocket]:
     host, port = udp.extra(SocketAttribute.local_address)
     assert isinstance(port, int)
 
-    transport = UDPTransport.create(host, port)
+    transport = UDPTransport(udp, host, port)
     return transport, udp
 
 

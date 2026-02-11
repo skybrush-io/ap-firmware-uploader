@@ -1,7 +1,7 @@
 from array import array
 from glob import glob
 from platform import system, uname
-from typing import Iterable, Optional, Sequence, TypeVar
+from typing import Iterable, Sequence, TypeVar
 
 __all__ = ("is_cygwin", "is_linux", "is_macos", "is_wsl", "get_serial_port_candidates")
 
@@ -118,7 +118,7 @@ def crc32(data: Iterable[int], state: int = 0) -> int:
     return state
 
 
-def get_serial_port_candidates(seed: Optional[Iterable[str]] = None) -> Iterable[str]:
+def get_serial_port_candidates(seed: Iterable[str] | None = None) -> Iterable[str]:
     """Given an optional iterable yielding glob patterns representing possible
     serial port candidates, returns an iterable that yields _actual_ serial
     ports to scan for an ArduPilot/PX4 device, taking into account the platform

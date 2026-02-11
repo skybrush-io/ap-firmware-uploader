@@ -1,8 +1,7 @@
 """TCP transport layer for the ArduPilot/PX4 uploader."""
 
-from anyio import connect_tcp, BusyResourceError, ClosedResourceError
+from anyio import BusyResourceError, ClosedResourceError, connect_tcp
 from anyio.abc import ByteStream
-from typing import Optional
 
 from .base import Transport
 
@@ -23,7 +22,7 @@ class TCPTransport(Transport):
     single batch.
     """
 
-    _stream: Optional[ByteStream] = None
+    _stream: ByteStream | None = None
     """The byte stream that the transport will use for sending packets."""
 
     def __init__(self, host: str, port: int, *, max_bytes: int = 65536):

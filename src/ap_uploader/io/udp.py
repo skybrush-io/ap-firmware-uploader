@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from anyio import (
-    create_udp_socket,
     ClosedResourceError,
+    create_udp_socket,
 )
 from anyio.abc import SocketAttribute, UDPSocket
-from contextlib import asynccontextmanager
-from typing import AsyncIterator, Optional
 
 from ap_uploader.network import (
     IPAddressAndPort,
@@ -33,7 +34,7 @@ class UDPTransport(Transport):
     _shared_socket: SharedUDPSocket
     """The shared UDP socket that the transport will use for sending datagrams."""
 
-    _subscription: Optional[SharedUDPSocketSubscription] = None
+    _subscription: SharedUDPSocketSubscription | None = None
     """Subscription to UDP datagrams sent by the remote host and port; ``None``
     if the transport is closed.
     """
@@ -117,12 +118,12 @@ class UDPListenerTransport(Transport):
     _local_address: IPAddressAndPort
     """The local host and port to listen on."""
 
-    _remote_address: Optional[IPAddressAndPort] = None
+    _remote_address: IPAddressAndPort | None = None
     """The remote host and port that the listener considers itself being
     connected to.
     """
 
-    _socket: Optional[UDPSocket] = None
+    _socket: UDPSocket | None = None
     """The UDP socket used for receiving and sending."""
 
     def __init__(self, host: str = "", port: int = 0):
@@ -168,21 +169,21 @@ class UDPListenerTransport(Transport):
         return port
 
     @property
-    def remote_address(self) -> Optional[IPAddressAndPort]:
+    def remote_address(self) -> IPAddressAndPort | None:
         """The IP address and port that the transport considers itself being
         connected to.
         """
         return self._remote_address
 
     @property
-    def remote_host(self) -> Optional[str]:
+    def remote_host(self) -> str | None:
         """The IP address that the transport considers itself being
         connected to.
         """
         return self._remote_address[0] if self._remote_address else None
 
     @property
-    def remote_port(self) -> Optional[int]:
+    def remote_port(self) -> int | None:
         """The remote port that the transport considers itself being
         connected to.
         """

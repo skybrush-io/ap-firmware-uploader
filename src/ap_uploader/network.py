@@ -1,20 +1,20 @@
 from __future__ import annotations
 
+from contextlib import aclosing, asynccontextmanager
+from socket import SO_BROADCAST, SOL_SOCKET
+from typing import AsyncIterator
+
 from anyio import (
+    TASK_STATUS_IGNORED,
+    ClosedResourceError,
+    WouldBlock,
     create_memory_object_stream,
     create_task_group,
     create_udp_socket,
     sleep_forever,
-    ClosedResourceError,
-    TASK_STATUS_IGNORED,
-    WouldBlock,
 )
 from anyio.abc import SocketAttribute, UDPSocket
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-from contextlib import aclosing, asynccontextmanager
-from socket import SOL_SOCKET, SO_BROADCAST
-from typing import AsyncIterator, Optional
-
 
 IPAddressAndPort = tuple[str, int]
 """Type alias for a pair of an IP address and a port."""
@@ -33,7 +33,7 @@ class SharedUDPSocket:
     _local_address: IPAddressAndPort
     """The local address of the socket that it will bind to."""
 
-    _socket: Optional[UDPSocket]
+    _socket: UDPSocket | None
     """The UDP socket wrapped by the wrapper class."""
 
     _subscriptions: dict[IPAddressAndPort, SharedUDPSocketSubscription]
@@ -42,14 +42,14 @@ class SharedUDPSocket:
     with the incoming datagrams from that IP address and port.
     """
 
-    _send_queue: Optional[MemoryObjectSendStream] = None
+    _send_queue: MemoryObjectSendStream | None = None
     """Queue in which the packets to be sent from the shared UDP socket are
     placed by other tasks.
     """
 
-    _unmatched_queue: Optional[
-        MemoryObjectSendStream[tuple[bytes, IPAddressAndPort]]
-    ] = None
+    _unmatched_queue: MemoryObjectSendStream[tuple[bytes, IPAddressAndPort]] | None = (
+        None
+    )
     """Queue in which the unmatched packets are placed by the shared UDP socket."""
 
     def __init__(self, local_host: str, local_port: int = 0, *, buffer_size: int = 64):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from anyio import create_memory_object_stream
 from anyio.abc import ObjectReceiveStream, ObjectSendStream
-from typing import Optional
 
 from .base import Transport
 
@@ -22,9 +21,9 @@ class InMemoryTransport(Transport):
         self,
         buffer_size: int = 0,
         *,
-        _sender: Optional[ObjectSendStream[bytes]] = None,
-        _receiver: Optional[ObjectReceiveStream[bytes]] = None,
-        _peer: Optional[InMemoryTransport] = None,
+        _sender: ObjectSendStream[bytes] | None = None,
+        _receiver: ObjectReceiveStream[bytes] | None = None,
+        _peer: InMemoryTransport | None = None,
     ):
         """Constructor."""
         if _peer is None:

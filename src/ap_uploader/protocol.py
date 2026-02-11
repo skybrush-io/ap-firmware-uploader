@@ -1,7 +1,6 @@
 from abc import ABC
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import Optional
 
 __all__ = (
     "Command",
@@ -466,7 +465,7 @@ class Protocol:
         """
         return self._state is ProtocolState.IN_SYNC
 
-    def next_event(self) -> Optional[Event]:
+    def next_event(self) -> Event | None:
         """Parses the front of the buffer of received bytes, updates the
         internal state and returns an appropriate event.
 
@@ -579,7 +578,7 @@ class Protocol:
         self._payload = b""
         self._bytes_expected = 0
 
-    def _purge_excess_data(self, up_to: Optional[int] = None) -> Optional[ExcessData]:
+    def _purge_excess_data(self, up_to: int | None = None) -> ExcessData | None:
         if up_to is None:
             up_to = len(self._buffer)
         else:

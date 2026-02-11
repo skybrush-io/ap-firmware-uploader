@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from anyio import Lock, fail_after
 from contextlib import AbstractAsyncContextManager
-from typing import Any, Optional, TypeVar, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeVar
+
+from anyio import Lock, fail_after
 
 from .io.base import Transport
 from .protocol import (
@@ -33,7 +34,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
     this connection object.
     """
 
-    _mavlink: Optional[MAVLink] = None
+    _mavlink: MAVLink | None = None
     """Local MAVLink protocol instance, needed if we have to send a MAVLink
     reboot command to ensure that the other end is in the bootloader."""
 
@@ -187,9 +188,9 @@ class BootloaderConnection(AbstractAsyncContextManager):
         command: Command,
         *,
         max_retries: int = 10,
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> bytes:
-        command_to_send: Optional[Command] = None
+        command_to_send: Command | None = None
         retries_left = max_retries
         sent = False
         has_timeout = timeout is not None
@@ -265,9 +266,9 @@ class BootloaderConnection(AbstractAsyncContextManager):
     async def _send_mavlink_reboot_command(self) -> None:
         """Sends a MAVLink "reboot to bootloader" command over the link."""
         from .mavlink import (
-            MAVLinkCommandLongMessage,
-            MAVLink,
             MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+            MAVLink,
+            MAVLinkCommandLongMessage,
         )
 
         message = MAVLinkCommandLongMessage(
