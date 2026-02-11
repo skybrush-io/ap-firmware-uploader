@@ -982,7 +982,7 @@ class MAVLink:
         try:
             # Note that initializers don't follow the Liskov Substitution Principle
             # therefore it can't be typechecked by mypy
-            m = message_type(*msg_tuple)  # type: ignore
+            m = message_type(*msg_tuple)
         except Exception as emsg:
             raise MAVError(
                 f"Unable to instantiate MAVLink message of type {message_type}: {emsg}"

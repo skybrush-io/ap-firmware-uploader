@@ -1,7 +1,7 @@
 """Serial port transport layer for the ArduPilot/PX4 uploader."""
 
 from functools import partial
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, Awaitable, Callable, TypeVar
 
 from anyio import (
     BusyResourceError,
@@ -140,9 +140,7 @@ class SerialPortByteStream(ByteStream):
         finally:
             self._task_group = None
 
-    def _read_worker(
-        self, sender: Callable[[bytes], Coroutine[None, None, None]]
-    ) -> None:
+    def _read_worker(self, sender: Callable[[bytes], Awaitable[None]]) -> None:
         """Runs the worker thread that is responsible for reading data from the
         serial port.
         """
@@ -168,7 +166,7 @@ class SerialPortByteStream(ByteStream):
 
     def _write_worker(
         self,
-        receiver: Callable[[], Coroutine[None, None, bytes]],
+        receiver: Callable[[], Awaitable[bytes]],
         on_exit: Callable[[], None],
     ) -> None:
         """Runs the worker thread that is responsible for writing data to the
@@ -249,11 +247,11 @@ class SerialPortByteStream(ByteStream):
             raise ClosedResourceError()
         return await self._reader_stream.receive_until(delimiter, max_bytes)
 
-    async def send(self, data: bytes) -> None:
+    async def send(self, item: bytes) -> None:
         """Sends the given bytes to the serial port."""
         if self._writer_thread_queue is None:
             raise ClosedResourceError()
-        await self._writer_thread_queue.send(data)
+        await self._writer_thread_queue.send(item)
 
     async def send_eof(self) -> None:
         raise NotImplementedError("Serial ports cannot send EOF")
@@ -261,7 +259,7 @@ class SerialPortByteStream(ByteStream):
     @property
     def baudrate(self) -> int:
         """The baud rate of the serial port."""
-        return self._port.baudrate  # type: ignore
+        return self._port.baudrate
 
     @baudrate.setter
     def baudrate(self, value: int) -> None:

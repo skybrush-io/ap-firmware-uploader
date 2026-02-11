@@ -1,4 +1,3 @@
-from abc import ABC
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
@@ -94,7 +93,7 @@ class ResponseType(IntEnum):
     BAD_SILICON_REV = OpCode.BAD_SILICON_REV
 
 
-class Event(ABC):
+class Event:
     """Base class for event objects emitted by the protocol."""
 
     __slots__ = ()
@@ -322,7 +321,7 @@ class Command(Event):
         else:
             return bytes([int(self.type), *self.args, int(OpCode.EOC)])
 
-    __hash__ = None  # type: ignore
+    __hash__ = None
 
 
 @dataclass(init=False, frozen=True)
@@ -382,7 +381,7 @@ class Response(Event):
         else:
             return bytes([int(OpCode.IN_SYNC), int(self.type)])
 
-    __hash__ = None  # type: ignore
+    __hash__ = None
 
 
 GET_SYNC = Command.get_sync()
