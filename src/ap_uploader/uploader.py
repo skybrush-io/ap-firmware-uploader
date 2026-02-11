@@ -9,7 +9,7 @@ from ipaddress import ip_address
 from itertools import repeat
 from typing import (
     Any,
-    AsyncIterable,
+    AsyncGenerator,
     AsyncIterator,
     Callable,
     Sequence,
@@ -211,7 +211,7 @@ class Uploader:
 
     async def generate_targets_from(
         self, scanner: Scanner
-    ) -> AsyncIterable[UploadTarget]:
+    ) -> AsyncGenerator[UploadTarget]:
         async for target in scanner.run():
             yield target
 

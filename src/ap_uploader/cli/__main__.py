@@ -1,7 +1,6 @@
 import logging
-
 from argparse import ArgumentParser
-from contextlib import aclosing, AsyncExitStack
+from contextlib import AsyncExitStack, aclosing
 
 from ap_uploader.scanners.fixed import FixedTargetList
 from ap_uploader.scanners.udp import UDPMAVLinkHeartbeatScanner
@@ -68,7 +67,7 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
             scanner = UDPMAVLinkHeartbeatScanner(socket)
 
         upload_target_generator = up.generate_targets_from(scanner)
-        async with aclosing(upload_target_generator) as upload_targets:  # type: ignore
+        async with aclosing(upload_target_generator) as upload_targets:
             async for target in upload_targets:
                 upload_task_group.start_upload_to(target)
 
