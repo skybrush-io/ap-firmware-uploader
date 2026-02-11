@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from typing import IO, Any, Mapping
 
 from anyio import to_thread
@@ -8,7 +8,7 @@ from .utils import crc32
 __all__ = ("Firmware", "load_firmware")
 
 
-class Firmware(metaclass=ABCMeta):
+class Firmware(ABC):
     """Interface specification for firmware objects that load a firmware from
     a file in a specific format.
     """

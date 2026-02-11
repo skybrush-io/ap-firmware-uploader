@@ -2,7 +2,7 @@
 where the current firmware can be uploaded, based on external events.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import AsyncIterable
 
 __all__ = ("Scanner", "UploadTarget")
@@ -10,7 +10,7 @@ __all__ = ("Scanner", "UploadTarget")
 UploadTarget = str
 
 
-class Scanner:
+class Scanner(ABC):
     """Base class for scanner tasks that generate upload targets where the
     current firmware can be uploaded, based on external events.
     """
