@@ -38,11 +38,10 @@ class RichConsoleUI(AbstractContextManager):
 
     def __init__(self):
         """Constructor."""
-        from rich.progress import Progress, SpinnerColumn
+        from rich.progress import Progress
 
         self._progress = Progress(
-            SpinnerColumn(),
-            "[bold white]{task.fields[source]:<13}[/bold white]",
+            "  [bold white]{task.fields[source]:<13}[/bold white]",
             *Progress.get_default_columns(),
         )
 
