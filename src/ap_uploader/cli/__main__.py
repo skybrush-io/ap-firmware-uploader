@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 from contextlib import AsyncExitStack, aclosing
 
 from ap_uploader.scanners.fixed import FixedTargetList
+from ap_uploader.scanners.serial import SerialPortScanner
 from ap_uploader.scanners.udp import UDPMAVLinkHeartbeatScanner
 from ap_uploader.uploader import LogEvent, Uploader, UploaderEventHandler
 
@@ -30,7 +31,9 @@ def create_parser() -> ArgumentParser:
     parser.add_argument(
         "-p",
         "--port",
-        help="serial port or IP address that the uploader will send data to",
+        help="serial port or IP address that the uploader will send data to. "
+        'Use "udp" to listen for incoming MAVLink heartbeats on UDP port 14550. '
+        "Omit to scan the serial ports for devices sending MAVLink heartbeats.",
         action="append",
     )
     return parser
@@ -54,17 +57,27 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
         )
 
         if ports:
-            scanner = FixedTargetList(ports)
+            if len(ports) == 1 and ports[0] == "udp":
+                on_event(
+                    "",
+                    LogEvent(
+                        logging.INFO,
+                        "Listening on UDP port 14550 for MAVLink heartbeats, ^C to exit...",
+                    ),
+                )
+                socket = await up.get_shared_udp_socket()
+                scanner = UDPMAVLinkHeartbeatScanner(socket)
+            else:
+                scanner = FixedTargetList(ports)
         else:
             on_event(
                 "",
                 LogEvent(
                     logging.INFO,
-                    "Listening on UDP port 14550 for MAVLink heartbeats, ^C to exit...",
+                    "Finding serial ports transmitting MAVLink heartbeats, ^C to exit...",
                 ),
             )
-            socket = await up.get_shared_udp_socket()
-            scanner = UDPMAVLinkHeartbeatScanner(socket)
+            scanner = SerialPortScanner()
 
         upload_target_generator = up.generate_targets_from(scanner)
         async with aclosing(upload_target_generator) as upload_targets:

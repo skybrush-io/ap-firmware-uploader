@@ -1,28 +1,43 @@
 from array import array
+from functools import cache
 from glob import glob
 from platform import system, uname
-from typing import Iterable, Sequence, TypeVar
+from typing import AsyncGenerator, Iterable, Sequence, TypeVar
 
-__all__ = ("is_cygwin", "is_linux", "is_macos", "is_wsl", "get_serial_port_candidates")
+from anyio import current_time, sleep_until
+
+__all__ = (
+    "is_cygwin",
+    "is_linux",
+    "is_macos",
+    "is_wsl",
+    "get_serial_port_candidates",
+    "looks_like_mavlink_heartbeat_from_autopilot",
+    "periodic",
+)
 
 T = TypeVar("T")
 
 
+@cache
 def is_cygwin() -> bool:
     """Returns whether the current platform is likely to be Cygwin."""
     return system().lower().startswith("cygwin")
 
 
+@cache
 def is_linux() -> bool:
     """Returns whether the current platform is likely to be Linux."""
     return system() == "Linux"
 
 
+@cache
 def is_macos() -> bool:
     """Returns whether the current platform is likely to be macOS."""
     return system() == "Darwin"
 
 
+@cache
 def is_wsl() -> bool:
     """Returns whether the current platform is likely to be WSL."""
     return "Microsoft" in uname()[2]
@@ -174,3 +189,54 @@ def iter_chunks(
     """
     for offset in range(start, len(seq), length):
         yield seq[offset : (offset + length)]
+
+
+def looks_like_flight_controller_vid_pid_pair(vid: int, pid: int) -> bool:
+    """Returns whether the given VID/PID pair looks like it belongs to a flight controller."""
+    return vid == 0x1209 and pid in (0x5740, 0x5741)
+
+
+def looks_like_mavlink_heartbeat_from_autopilot(data: bytes) -> bool:
+    """Returns whether the given chunk of data looks like a MAVLink hearrbeat from an
+    autopilot.
+    """
+    if not data:
+        return False
+
+    # TODO(ntamas): handle multiple MAVLink packets stuffed into
+    # a single UDP packet!
+
+    if data[0] == 0xFE and len(data) >= 8:
+        # Looks like a MAVLink 1 packet. Check whether it comes from an autopilot
+        # (system ID = 1, message type = 0).
+        return data[4] == 1 and data[5] == 0
+
+    if data[0] == 0xFD and len(data) >= 12:
+        # Looks like a MAVLink 2 packet. Check whether it comes from an autopilot
+        # (system ID = 1, message type = 0).
+        return data[6] == 1 and data[7:10] == b"\x00\x00\x00"
+
+    return False
+
+
+async def periodic(period) -> AsyncGenerator[tuple[float, float | None], None]:
+    """Yield `(elapsed_time, delta_time)` with an interval of `period` seconds.
+
+    For example, to loop indefinitely with a period of 1 second, accounting
+    for the time taken in the loop itself::
+
+        async for _ in periodic(1):
+            ...
+
+    In the case of overrun, the next iteration begins immediately.
+
+    On the first iteration, `delta_time` will be `None`.
+    """
+    t0 = current_time()
+    t_start = t0
+    delta_time: float | None = None
+    while True:
+        yield t_start - t0, delta_time
+        await sleep_until(t_start + period)
+        t_last, t_start = t_start, current_time()
+        delta_time = t_start - t_last

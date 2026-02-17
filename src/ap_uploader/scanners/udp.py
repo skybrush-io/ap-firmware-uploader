@@ -1,6 +1,7 @@
 from typing import AsyncIterable
 
 from ap_uploader.network import IPAddressAndPort, SharedUDPSocket
+from ap_uploader.utils import looks_like_mavlink_heartbeat_from_autopilot
 
 from .base import Scanner, UploadTarget
 
@@ -25,30 +26,10 @@ class UDPMAVLinkHeartbeatScanner(Scanner):
 
         async with self._socket.unmatched_handler() as queue:
             async for payload, sender in queue:
-                if not payload:
-                    continue
-
-                if sender in yielded:
-                    continue
-
-                # TODO(ntamas): handle multiple MAVLink packets stuffed into
-                # a single UDP packet!
-
-                found = False
-
-                if payload[0] == 0xFE and len(payload) >= 8:
-                    # Looks like a MAVLink 1 packet
-                    if payload[4] == 1 and payload[5] == 0:
-                        # Heartbeat packet from an autopilot
-                        found = True
-
-                elif payload[0] == 0xFD and len(payload) >= 12:
-                    # Looks like a MAVLink 2 packet
-                    if payload[6] == 1 and payload[7:10] == b"\x00\x00\x00":
-                        # Heartbeat packet from an autopilot
-                        found = True
-
-                if found:
+                if (
+                    sender not in yielded
+                    and looks_like_mavlink_heartbeat_from_autopilot(payload)
+                ):
                     yielded.add(sender)
                     host, port = sender
                     yield f"{host}:{port}"
