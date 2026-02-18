@@ -22,6 +22,7 @@ from anyio import (
     Lock,
     create_task_group,
     get_cancelled_exc_class,
+    sleep,
     to_thread,
 )
 from anyio.abc import TaskGroup
@@ -106,6 +107,9 @@ class UploaderLifecycleEvent(UploaderEvent):
 
     cancelled: bool | None = None
     """Whether the upload was cancelled; only valid for "finished" events."""
+
+    retrying: bool | None = None
+    """Whether the upload is being retried; only valid for "finished" events."""
 
 
 @dataclass
@@ -227,7 +231,12 @@ class Uploader:
         self._firmware = await load_firmware(path)
 
     async def upload_firmware(
-        self, port: str, *, on_event: Callable[[UploaderEvent], None]
+        self,
+        port: str,
+        *,
+        expecting_failure: bool = False,
+        on_event: Callable[[UploaderEvent], None],
+        on_expected_failure: Callable[[int], None] | None = None,
     ) -> None:
         """Runs an asynchronous task to upload the loaded firmware into the
         drone at the given port.
@@ -239,6 +248,9 @@ class Uploader:
                 during the upload process. The callback will be called with the
                 event as its only argument. Typically this is tied to a user
                 interface object so the UI is updated during the upload properly.
+            on_expected_failure: a synchronous callback that can be used to inform the
+                uploader that an expected failure has happened during the upload
+                process, so it can react to it properly
         """
         firmware = self._firmware
         if firmware is None:
@@ -247,12 +259,21 @@ class Uploader:
         on_event(UploaderLifecycleEvent(type="started"))
         on_event(UploadStepEvent(step=UploadStep.CONNECTING))
 
-        success, cancelled = False, False
+        success, cancelled, retrying = False, False, expecting_failure
+
+        def on_rebooted():
+            nonlocal retrying
+            retrying = True
+
+            # If the device has to be rebooted to reach the bootloader, we expect the
+            # next few operations to fail because of the reboot
+            if on_expected_failure:
+                on_expected_failure(3)
 
         try:
             transport = await self._create_transport(port)
             async with BootloaderConnection(transport) as connection:
-                await connection.ensure_in_bootloader()
+                await connection.ensure_in_bootloader(on_rebooted=on_rebooted)
 
                 flash_size = await connection.get_flash_memory_size()
                 bl_rev = await connection.get_bootloader_revision()
@@ -327,7 +348,10 @@ class Uploader:
         finally:
             on_event(
                 UploaderLifecycleEvent(
-                    type="finished", success=success, cancelled=cancelled
+                    type="finished",
+                    success=success,
+                    cancelled=cancelled,
+                    retrying=retrying,
                 )
             )
 
@@ -386,6 +410,102 @@ class Uploader:
 T = TypeVar("T", bound="UploaderTaskGroup")
 
 
+class UploaderTask:
+    _port: str
+    _expected_failures: int = 0
+
+    def __init__(self, port: str):
+        self._port = port
+
+    async def run(
+        self,
+        uploader: Uploader,
+        *,
+        on_event: UploaderEventHandler,
+        retries: int,
+        limiter: CapacityLimiter | None = None,
+    ) -> None:
+        on_event = partial(on_event, self._port)
+
+        attempt = 0
+
+        while attempt <= retries:
+            acquired = False
+            try:
+                if limiter:
+                    await limiter.acquire()
+                    acquired = True
+                await uploader.upload_firmware(
+                    self._port,
+                    expecting_failure=self._expected_failures > 0,
+                    on_event=on_event,
+                    on_expected_failure=self._expect_failure,
+                )
+            except ExceptionGroup as ex:
+                message, should_retry = await self._handle_exceptions(ex.exceptions)
+            except Exception as ex:
+                message, should_retry = await self._handle_exceptions([ex])
+            else:
+                break
+            finally:
+                if acquired and limiter:
+                    limiter.release()
+
+            # We get here only if there was an exception during the upload
+            if not should_retry:
+                attempt = retries
+
+            if attempt < retries:
+                if message:
+                    on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
+                else:
+                    # Empty message means that the failure is expected and we should
+                    # simply retry silently
+                    pass
+            else:
+                on_event(LogEvent(logging.ERROR, message))
+
+            attempt += 1
+
+    def _expect_failure(self, count: int = 1):
+        self._expected_failures += count
+
+    async def _handle_exceptions(self, exceptions: Sequence[Exception]):
+        if self._expected_failures > 0:
+            self._expected_failures -= 1
+            await sleep(0.5)
+            return "", True
+
+        should_retry = True
+        reasons: list[str] = []
+        timed_out = False
+
+        for exc in exceptions:
+            if isinstance(exc, TimeoutError):
+                timed_out = True
+            elif isinstance(exc, RuntimeError):
+                reasons.append(str(exc))
+            elif isinstance(exc, OSError):
+                reasons.append(exc.strerror or str(exc))
+            else:
+                reasons.append(repr(exc))
+
+            if isinstance(exc, OSError) and exc.errno in (
+                errno.ENOENT,
+                errno.EADDRINUSE,
+            ):
+                should_retry = False
+
+        if reasons:
+            message = f"Upload failed: {', '.join(reasons)}"
+        elif timed_out:
+            message = "Upload timed out"
+        else:
+            message = "Upload failed"
+
+        return message, should_retry
+
+
 class UploaderTaskGroup:
     """A task group that is responsible for running multiple upload tasks in
     parallel, with configurable retry counts, in a way that upload tasks are
@@ -439,67 +559,12 @@ class UploaderTaskGroup:
         return await self._task_group.__aexit__(*args)
 
     def start_upload_to(self, port: str) -> None:
-        self._task_group.start_soon(self._run_upload_in_protected_context, port)
-
-    async def _run_upload_in_protected_context(self, port: str) -> None:
-        on_event = partial(self._on_event, port)
-        attempt = 0
-        while attempt <= self._retries:
-            acquired = False
-            try:
-                if self._limiter:
-                    await self._limiter.acquire()
-                    acquired = True
-                await self._uploader.upload_firmware(port, on_event=on_event)
-            except ExceptionGroup as ex:
-                message, should_retry = self._handle_exceptions_during_upload(
-                    ex.exceptions
-                )
-            except Exception as ex:
-                message, should_retry = self._handle_exceptions_during_upload([ex])
-            else:
-                break
-            finally:
-                if acquired and self._limiter:
-                    self._limiter.release()
-
-            # We get here only if there was an exception during the upload
-            if not should_retry:
-                attempt = self._retries
-
-            if attempt < self._retries:
-                on_event(LogEvent(logging.WARNING, f"{message}, retrying..."))
-            else:
-                on_event(LogEvent(logging.ERROR, message))
-
-            attempt += 1
-
-    def _handle_exceptions_during_upload(self, exceptions: Sequence[Exception]):
-        should_retry = True
-        reasons: list[str] = []
-        timed_out = False
-
-        for exc in exceptions:
-            if isinstance(exc, TimeoutError):
-                timed_out = True
-            elif isinstance(exc, RuntimeError):
-                reasons.append(str(exc))
-            elif isinstance(exc, OSError):
-                reasons.append(exc.strerror or str(exc))
-            else:
-                reasons.append(repr(exc))
-
-            if isinstance(exc, OSError) and exc.errno in (
-                errno.ENOENT,
-                errno.EADDRINUSE,
-            ):
-                should_retry = False
-
-        if reasons:
-            message = f"Upload failed: {', '.join(reasons)}"
-        elif timed_out:
-            message = "Upload timed out"
-        else:
-            message = "Upload failed"
-
-        return message, should_retry
+        task = UploaderTask(port)
+        runner = partial(
+            task.run,
+            uploader=self._uploader,
+            limiter=self._limiter,
+            retries=self._retries,
+            on_event=self._on_event,
+        )
+        self._task_group.start_soon(runner)

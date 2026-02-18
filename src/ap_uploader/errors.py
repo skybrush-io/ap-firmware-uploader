@@ -1,4 +1,4 @@
-__all__ = ("UploaderError", "NotSupportedError")
+__all__ = ("UploaderError", "NotSupportedError", "ExcessDataError")
 
 
 class UploaderError(RuntimeError):
@@ -7,3 +7,8 @@ class UploaderError(RuntimeError):
 
 class NotSupportedError(UploaderError):
     pass
+
+
+class ExcessDataError(UploaderError):
+    def __init__(self) -> None:
+        super().__init__("unexpected data received")

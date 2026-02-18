@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from anyio import Lock, fail_after
+
+from ap_uploader.errors import ExcessDataError
 
 from .io.base import Transport
 from .protocol import (
@@ -71,11 +73,17 @@ class BootloaderConnection(AbstractAsyncContextManager):
         await self._transport.__aexit__(*args)
         return result
 
-    async def ensure_in_bootloader(self) -> None:
+    async def ensure_in_bootloader(
+        self, *, on_rebooted: Callable[[], None] | None = None
+    ) -> None:
         """Ensures that the board being updated is in the bootloader. If it
         does not respond to sync packets, the function assumes that the board
         is accepting MAVLink commands and attempts to send a MAVLink reboot
         packet.
+
+        Args:
+            on_rebooted: callback that will be called if we had to send a reboot
+                command to the device.
         """
         async with self._lock:
             # Try to communicate with the bootloader by fetching the board ID
@@ -87,8 +95,10 @@ class BootloaderConnection(AbstractAsyncContextManager):
                     max_retries=1,
                     timeout=0.05,
                 )
-            except TimeoutError:
+            except (TimeoutError, ExcessDataError):
                 await self._send_mavlink_reboot_command()
+                if on_rebooted:
+                    on_rebooted()
                 await self._process_command_inner(
                     Command.get_device_info(DeviceInfoItem.BOARD_ID),
                     max_retries=5,
@@ -256,7 +266,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
                 # belonged to a previous command
                 self._protocol.reset()
                 if not retries_left:
-                    raise RuntimeError("unexpected data received")
+                    raise ExcessDataError()
                 else:
                     retries_left -= 1
 

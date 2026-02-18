@@ -71,6 +71,8 @@ class RichConsoleUI(AbstractContextManager):
                 if not event.success:
                     if event.cancelled:
                         description = "[yellow bold]Cancelled    [/yellow bold]"
+                    elif event.retrying:
+                        description = "[yellow bold]Waiting...   [/yellow bold]"
                     else:
                         description = "[red bold]Failed :(    [/red bold]"
                 else:
