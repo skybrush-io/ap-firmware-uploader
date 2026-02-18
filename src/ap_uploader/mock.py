@@ -1,11 +1,11 @@
 __all__ = ("MockBootloader",)
 
-from anyio import fail_after, sleep, TASK_STATUS_IGNORED
 from random import random
 
-from ap_uploader.io.udp import UDPListenerTransport
+from anyio import TASK_STATUS_IGNORED, fail_after, sleep
 
 from .io.base import Transport
+from .io.udp import UDPListenerTransport
 from .protocol import Command, DeviceInfoItem, OpCode, Protocol, Response
 from .utils import crc32
 
@@ -274,6 +274,7 @@ async def run_mock_bootloader(port: str, transport: Transport, options) -> None:
 
 async def run_mock_bootloaders(options) -> None:
     from anyio import create_task_group
+
     from .io.serial import SerialPortTransport
 
     async with create_task_group() as tg:
@@ -293,8 +294,9 @@ def mock_main():  # pragma: no cover
     """Entry point for a CLI application that connects a mock bootloader to
     a serial port.
     """
-    from anyio import run
     from argparse import ArgumentParser
+
+    from anyio import run
 
     parser = ArgumentParser()
     parser.add_argument(

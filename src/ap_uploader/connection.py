@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from anyio import Lock, fail_after
 
-from ap_uploader.errors import ExcessDataError
-
+from .errors import ExcessDataError
 from .io.base import Transport
 from .protocol import (
     GET_SYNC,
