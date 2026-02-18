@@ -101,7 +101,6 @@ class SerialPortScanner(Scanner):
             return False
 
         # TODO(ntamas): finish this
-        print(name)
         return True
 
     @staticmethod
