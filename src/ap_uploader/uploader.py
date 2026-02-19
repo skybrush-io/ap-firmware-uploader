@@ -19,6 +19,7 @@ from typing import (
 
 from anyio import (
     CapacityLimiter,
+    Event,
     Lock,
     create_task_group,
     get_cancelled_exc_class,
@@ -287,7 +288,32 @@ class Uploader:
                 (await connection.get_serial_number()).hex(":", bytes_per_sep=1)
 
                 on_event(UploadStepEvent(step=UploadStep.ERASING))
-                await connection.erase_flash_memory()
+
+                # Erasing the flash memory is a longer process and the bootloader does
+                # not provide any progress information, so we just fake it
+                erase_done_event = Event()
+
+                async def fake_progress_during_erase():
+                    progress = 0.0
+                    while True:
+                        await sleep(1)
+                        if progress < 0.8:
+                            progress += 0.05
+                        else:
+                            progress += (1 - progress) / 2
+                        if progress > 0.99:
+                            progress = 0.99
+                        on_event(UploadProgressEvent(progress=progress))
+
+                async def do_erase():
+                    await connection.erase_flash_memory()
+                    erase_done_event.set()
+
+                async with create_task_group() as tg:
+                    tg.start_soon(fake_progress_during_erase)
+                    tg.start_soon(do_erase)
+                    await erase_done_event.wait()
+                    tg.cancel_scope.cancel()
 
                 on_event(UploadStepEvent(step=UploadStep.UPLOADING))
 
