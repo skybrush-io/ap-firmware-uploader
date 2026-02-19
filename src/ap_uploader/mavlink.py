@@ -722,7 +722,7 @@ class MAVLink:
         self.buf_index = 0
         self.expected_length = HEADER_LEN_V1 + 2
         self.have_prefix_error = False
-        self.robust_parsing = False
+        self.robust_parsing = True
         self.protocol_marker = 253
         self.little_endian = True
         self.crc_extra = True

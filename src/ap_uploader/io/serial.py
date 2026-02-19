@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Awaitable, Callable, TypeVar
 
 from anyio import (
+    BrokenResourceError,
     BusyResourceError,
     CancelScope,
     ClosedResourceError,
@@ -102,6 +103,7 @@ class SerialPortByteStream(ByteStream):
         await task_group.__aenter__()
 
         reader_tx, rx = create_memory_object_stream[bytes](0)
+        reader_stream = BufferedByteReceiveStream(rx)
         task_group.start_soon(
             partial(
                 to_thread.run_sync,
@@ -110,7 +112,6 @@ class SerialPortByteStream(ByteStream):
                 abandon_on_cancel=True,
             )
         )
-        reader_stream = BufferedByteReceiveStream(rx)
 
         writer_tx, rx = create_memory_object_stream[bytes](0)
         writer_done = Event()
@@ -161,7 +162,7 @@ class SerialPortByteStream(ByteStream):
                 pass
             else:
                 raise
-        except (PortNotOpenError, ClosedResourceError):
+        except (PortNotOpenError, ClosedResourceError, BrokenResourceError):
             pass
 
     def _write_worker(

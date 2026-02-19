@@ -11,13 +11,16 @@ from typing import (
     Any,
     AsyncGenerator,
     AsyncIterator,
+    Awaitable,
     Callable,
+    Protocol,
     Sequence,
     TypeAlias,
     TypeVar,
 )
 
 from anyio import (
+    BrokenResourceError,
     CapacityLimiter,
     Event,
     Lock,
@@ -231,6 +234,69 @@ class Uploader:
         """Loads the firmware file at the given path."""
         self._firmware = await load_firmware(path)
 
+    async def perform_factory_reset(
+        self,
+        port: str,
+        *,
+        expecting_failure: bool = False,
+        on_event: Callable[[UploaderEvent], None],
+        on_expected_failure: Callable[[int], None] | None = None,
+    ) -> None:
+        """Runs an asynchronous task to factory reset the drone at the given
+        port.
+
+        Parameters:
+            port: the port to factory reset. May be an IP address or the
+                identifier of a serial port.
+            on_event: a synchronous callback to call when an event happens
+                during the factory reset process. The callback will be called
+                with the event as its only argument. Typically this is tied to a
+                user interface object so the UI is updated during the factory
+                reset properly.
+        """
+        on_event(UploaderLifecycleEvent(type="started"))
+        on_event(UploadStepEvent(step=UploadStep.CONNECTING))
+
+        success, cancelled, retrying = False, False, expecting_failure
+
+        def on_rebooted():
+            nonlocal retrying
+            retrying = True
+
+            # If the device has to be rebooted to reach the main firmware, we expect the
+            # next few operations to fail because of the reboot
+            if on_expected_failure:
+                on_expected_failure(10)
+
+        try:
+            transport = await self._create_transport(port)
+            async with BootloaderConnection(transport) as connection:
+                await connection.ensure_in_mavlink(on_rebooted=on_rebooted)
+                await connection.reset_to_factory_defaults()
+
+                on_event(UploadStepEvent(step=UploadStep.REBOOTING))
+                try:
+                    await connection.reboot()
+                except BrokenResourceError:
+                    # The connection may be already closed by the reboot, ignore this error
+                    pass
+
+                on_event(UploadStepEvent(step=UploadStep.FINISHED))
+
+                success = True
+        except get_cancelled_exc_class():
+            cancelled = True
+            raise
+        finally:
+            on_event(
+                UploaderLifecycleEvent(
+                    type="finished",
+                    success=success,
+                    cancelled=cancelled,
+                    retrying=False,
+                )
+            )
+
     async def upload_firmware(
         self,
         port: str,
@@ -298,7 +364,7 @@ class Uploader:
                     while True:
                         await sleep(1)
                         if progress < 0.8:
-                            progress += 0.05
+                            progress += 0.1
                         else:
                             progress += (1 - progress) / 2
                         if progress > 0.99:
@@ -436,6 +502,17 @@ class Uploader:
 T = TypeVar("T", bound="UploaderTaskGroup")
 
 
+class UploaderTaskCallable(Protocol):
+    def __call__(
+        self,
+        port: str,
+        *,
+        expecting_failure: bool,
+        on_event: Callable[[UploaderEvent], None],
+        on_expected_failure: Callable[[int], None] | None,
+    ) -> Awaitable[None]: ...
+
+
 class UploaderTask:
     _port: str
     _expected_failures: int = 0
@@ -445,7 +522,7 @@ class UploaderTask:
 
     async def run(
         self,
-        uploader: Uploader,
+        func: UploaderTaskCallable,
         *,
         on_event: UploaderEventHandler,
         retries: int,
@@ -461,7 +538,7 @@ class UploaderTask:
                 if limiter:
                     await limiter.acquire()
                     acquired = True
-                await uploader.upload_firmware(
+                await func(
                     self._port,
                     expecting_failure=self._expected_failures > 0,
                     on_event=on_event,
@@ -584,11 +661,17 @@ class UploaderTaskGroup:
     async def __aexit__(self, *args: Any) -> bool | None:
         return await self._task_group.__aexit__(*args)
 
+    def start_factory_reset_on(self, port: str) -> None:
+        self._start_task(self._uploader.perform_factory_reset, port)
+
     def start_upload_to(self, port: str) -> None:
+        self._start_task(self._uploader.upload_firmware, port)
+
+    def _start_task(self, func: UploaderTaskCallable, port: str) -> None:
         task = UploaderTask(port)
         runner = partial(
             task.run,
-            uploader=self._uploader,
+            func,
             limiter=self._limiter,
             retries=self._retries,
             on_event=self._on_event,

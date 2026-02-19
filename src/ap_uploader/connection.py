@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, cast
 
 from anyio import Lock, fail_after
 
@@ -18,7 +18,7 @@ from .protocol import (
 )
 
 if TYPE_CHECKING:
-    from .mavlink import MAVLink
+    from .mavlink import MAVLink, MAVLinkHeartbeatMessage, MAVLinkMessage
 
 __all__ = ("BootloaderConnection",)
 
@@ -38,6 +38,14 @@ class BootloaderConnection(AbstractAsyncContextManager):
     _mavlink: MAVLink | None = None
     """Local MAVLink protocol instance, needed if we have to send a MAVLink
     reboot command to ensure that the other end is in the bootloader."""
+
+    _mode: Literal["bootloader", "mavlink", "unknown"] = "unknown"
+    """The current mode of the connection. "bootloader" means that we are in
+    sync with the bootloader and can send bootloader commands, "mavlink" means
+    that we are in sync with the MAVLink firmware and can send MAVLink commands,
+    "unknown" means that we don't know which one we are in, and we might have to
+    try both to figure it out.
+    """
 
     _protocol: Protocol
     """The protocol object that keeps track of the state of communication with
@@ -95,7 +103,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
                     timeout=0.05,
                 )
             except (TimeoutError, ExcessDataError):
-                await self._send_mavlink_reboot_command()
+                await self._send_mavlink_reboot_command(to_bootloader=True)
                 if on_rebooted:
                     on_rebooted()
                 await self._process_command_inner(
@@ -103,6 +111,31 @@ class BootloaderConnection(AbstractAsyncContextManager):
                     max_retries=5,
                     timeout=0.5,
                 )
+
+        self._mode = "bootloader"
+
+    async def ensure_in_mavlink(
+        self, *, on_rebooted: Callable[[], None] | None = None, timeout: float = 2.0
+    ) -> None:
+        """Ensures that the board being updated is running its "normal" firmware.
+        If it does not send a MAVLink heartbeat packet within a given number of
+        seconds, the function assumes that the board is in the bootloader and asks
+        it to boot the main firmware.
+
+        Args:
+            on_rebooted: callback that will be called if we had to send a boot
+                command to the device.
+        """
+        async with self._lock:
+            try:
+                with fail_after(timeout):
+                    await self._wait_for_heartbeat()
+            except (TimeoutError, ExcessDataError):
+                await self._send_bootloader_reboot_command()
+                if on_rebooted:
+                    on_rebooted()
+
+        self._mode = "mavlink"
 
     async def erase_flash_memory(self) -> None:
         """Erases the flash memory of the board, and resets the write pointer
@@ -167,9 +200,37 @@ class BootloaderConnection(AbstractAsyncContextManager):
         # succeeded or not, so we do not allow any retries
         await self._process_command(Command.program_bytes(data), max_retries=0)
 
-    async def reboot(self) -> None:
+    async def reboot(self, *, to_bootloader: bool = False) -> None:
         """Reboots the device."""
-        await self._process_command(Command.reboot())
+        if self._mode == "mavlink":
+            await self._send_mavlink_reboot_command(to_bootloader=to_bootloader)
+        elif self._mode == "bootloader":
+            if to_bootloader:
+                raise RuntimeError(
+                    "cannot reboot to bootloader when already in bootloader"
+                )
+            await self._send_bootloader_reboot_command()
+        else:
+            raise RuntimeError("unknown mode, cannot reboot")
+
+    async def reset_to_factory_defaults(self) -> None:
+        """Sends a MAVLink command to reset the parameters of the drone to factory
+        defaults.
+
+        The drone needs to be running the firmware (i.e. not the bootloader).
+        Works on ArduPilot only.
+        """
+        from .mavlink import MAVLinkParamSetMessage
+
+        await self._send_mavlink_message(
+            MAVLinkParamSetMessage(
+                0,  # target_system
+                1,  # target_component
+                b"FORMAT_VERSION",
+                0.0,
+                0,
+            )
+        )
 
     async def _get_device_info(self, item: DeviceInfoItem) -> int:
         """Retrieves the given device info item from the bootloader.
@@ -272,26 +333,54 @@ class BootloaderConnection(AbstractAsyncContextManager):
             else:
                 raise RuntimeError(f"unexpected event: {event!r}")
 
-    async def _send_mavlink_reboot_command(self) -> None:
-        """Sends a MAVLink "reboot to bootloader" command over the link."""
+    async def _send_bootloader_reboot_command(self) -> None:
+        """Sends a reboot command to the bootloader to ask it to reboot into the
+        main firmware.
+        """
+        await self._process_command(Command.reboot())
+
+    async def _send_mavlink_reboot_command(
+        self, *, to_bootloader: bool = False
+    ) -> None:
+        """Sends a MAVLink "reboot to bootloader" command over the link to ask the
+        main firmware to reboot into the bootloader.
+        """
         from .mavlink import (
             MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
-            MAVLink,
             MAVLinkCommandLongMessage,
         )
 
-        message = MAVLinkCommandLongMessage(
-            0,  # target_system
-            1,  # target_component
-            MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
-            1,  # confirmation
-            3,  # stay in bootloader
+        await self._send_mavlink_message(
+            MAVLinkCommandLongMessage(
+                0,  # target_system
+                1,  # target_component
+                MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+                1,  # confirmation
+                3 if to_bootloader else 1,  # reboot or reboot to bootloader
+            )
         )
+
+    def _get_mavlink(self) -> MAVLink:
+        from .mavlink import MAVLink
+
         if self._mavlink is None:
             self._mavlink = MAVLink(self._system_id, 190)  # comp ID = GCS
-        data = self._mavlink.encode(message, force_mavlink1=True)
+        return self._mavlink
 
-        # TODO(ntamas): at this point, the transport might close and we might
-        # need to connect to a _new_ transport. It's complicated to get this
-        # right on all platforms.
+    async def _send_mavlink_message(self, message: MAVLinkMessage) -> None:
+        data = self._get_mavlink().encode(message, force_mavlink1=True)
         await self._transport.send(data)
+
+    async def _wait_for_heartbeat(self) -> MAVLinkHeartbeatMessage:
+        """Waits for a MAVLink heartbeat message to be received from the other end.
+
+        This is useful to wait for the device to reboot into the firmware after
+        programming, before we attempt to communicate with it using MAVLink.
+        """
+        mavlink = self._get_mavlink()
+
+        while True:
+            data = await self._transport.receive()
+            for message in mavlink.parse_buffer(data) or ():
+                if message.get_type() == "HEARTBEAT":
+                    return cast("MAVLinkHeartbeatMessage", message)

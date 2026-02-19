@@ -13,7 +13,12 @@ from .rich_ui import RichConsoleUI
 def create_parser() -> ArgumentParser:
     """Creates the command line parser for the uploader CLI."""
     parser = ArgumentParser(description="ArduPilot/PX4 firmware uploader")
-    parser.add_argument("firmware", help="path to the firmware file to upload")
+    parser.add_argument(
+        "firmware",
+        help="path to the firmware file to upload",
+        default=None,
+        nargs="?",
+    )
     parser.add_argument(
         "--max-concurrency",
         metavar="NUM_TASKS",
@@ -36,6 +41,11 @@ def create_parser() -> ArgumentParser:
         "Omit to scan the serial ports for devices sending MAVLink heartbeats.",
         action="append",
     )
+    parser.add_argument(
+        "--factory-reset",
+        help="perform a factory reset instead of uploading a firmware",
+        action="store_true",
+    )
     return parser
 
 
@@ -44,9 +54,16 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
     max_concurrency: int = max(options.max_concurrency, 0)
     retries: int = max(options.retries, 0)
 
+    if options.firmware is not None:
+        if options.factory_reset:
+            raise RuntimeError(
+                "cannot use --factory-reset together with a firmware image"
+            )
+
     async with AsyncExitStack() as stack:
         up = await stack.enter_async_context(Uploader().use())
-        await up.load_firmware(options.firmware)
+        if options.firmware is not None:
+            await up.load_firmware(options.firmware)
 
         upload_task_group = await stack.enter_async_context(
             up.create_task_group(
@@ -81,8 +98,13 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
 
         upload_target_generator = up.generate_targets_from(scanner)
         async with aclosing(upload_target_generator) as upload_targets:
-            async for target in upload_targets:
-                upload_task_group.start_upload_to(target)
+            if options.firmware is not None:
+                async for target in upload_targets:
+                    upload_task_group.start_upload_to(target)
+
+            if options.factory_reset:
+                async for target in upload_targets:
+                    upload_task_group.start_factory_reset_on(target)
 
 
 def main() -> None:
