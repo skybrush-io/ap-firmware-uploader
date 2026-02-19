@@ -307,6 +307,7 @@ MAV_CMD_ENUM_END = 247
 MAVLINK_MSG_ID_BAD_DATA = -1
 MAVLINK_MSG_ID_UNKNOWN = -2
 MAVLINK_MSG_ID_HEARTBEAT = 0
+MAVLINK_MSG_ID_PARAM_SET = 23
 MAVLINK_MSG_ID_COMMAND_LONG = 76
 MAVLINK_MSG_ID_COMMAND_ACK = 77
 
@@ -564,10 +565,78 @@ class MAVLinkCommandACKMessage(MAVLinkMessage):
         )
 
 
+class MAVLinkParamSetMessage(MAVLinkMessage):
+    id = MAVLINK_MSG_ID_PARAM_SET
+    msgname = "PARAM_SET"
+    fieldnames = [
+        "target_system",
+        "target_component",
+        "param_id",
+        "param_value",
+        "param_type",
+    ]
+    ordered_fieldnames = [
+        "param_value",
+        "target_system",
+        "target_component",
+        "param_id",
+        "param_type",
+    ]
+    fieldtypes = ["uint8_t", "uint8_t", "char", "float", "uint8_t"]
+    has_bytes = True
+    fielddisplays_by_name: dict[str, str] = {}
+    fieldenums_by_name: dict[str, str] = {"param_type": "MAV_PARAM_TYPE"}
+    fieldunits_by_name: dict[str, str] = {}
+    native_format = bytearray(b"<fBBcB")
+    orders = [1, 2, 3, 0, 4]
+    lengths = [1, 1, 1, 1, 1]
+    has_array = False
+    cumulative_lengths = [0, 1, 2, 3, 4]
+    array_lengths = [0, 0, 0, 16, 0]
+    crc_extra = 168
+    unpacker = struct.Struct("<fBB16sB")
+    instance_field = None
+    instance_offset = -1
+
+    def __init__(
+        self,
+        target_system: int,
+        target_component: int,
+        param_id: bytes,
+        param_value: float,
+        param_type: int,
+    ):
+        super().__init__(MAVLINK_MSG_ID_PARAM_SET, "PARAM_SET")
+        self._fieldnames = MAVLinkParamSetMessage.fieldnames
+        self._instance_field = MAVLinkParamSetMessage.instance_field
+        self._instance_offset = MAVLinkParamSetMessage.instance_offset
+        self.target_system = target_system
+        self.target_component = target_component
+        self._param_id_raw = param_id
+        self.param_id = param_id.split(b"\x00", 1)[0].decode("ascii", errors="replace")
+        self.param_value = param_value
+        self.param_type = param_type
+
+    def pack(self, mav: "MAVLink", force_mavlink1: bool = False) -> bytes:
+        return self.pack_msg(
+            mav,
+            self.crc_extra,
+            self.unpacker.pack(
+                self.param_value,
+                self.target_system,
+                self.target_component,
+                self._param_id_raw,
+                self.param_type,
+            ),
+            force_mavlink1=force_mavlink1,
+        )
+
+
 mavlink_map = {
     MAVLINK_MSG_ID_HEARTBEAT: MAVLinkHeartbeatMessage,
     MAVLINK_MSG_ID_COMMAND_LONG: MAVLinkCommandLongMessage,
     MAVLINK_MSG_ID_COMMAND_ACK: MAVLinkCommandACKMessage,
+    MAVLINK_MSG_ID_PARAM_SET: MAVLinkParamSetMessage,
 }
 
 
