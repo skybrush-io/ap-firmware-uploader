@@ -227,6 +227,7 @@ class BootloaderConnection(AbstractAsyncContextManager):
                 0,  # target_system
                 1,  # target_component
                 MAV_CMD_FLASH_BOOTLOADER,
+                0,  # confirmation
                 0,
                 0,
                 0,
