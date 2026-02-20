@@ -46,6 +46,11 @@ def create_parser() -> ArgumentParser:
         help="perform a factory reset instead of uploading a firmware",
         action="store_true",
     )
+    parser.add_argument(
+        "--flash-bootloader",
+        help="flash the bootloader embedded in the main firmware image instead of uploading a firmware",
+        action="store_true",
+    )
     return parser
 
 
@@ -58,6 +63,10 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
         if options.factory_reset:
             raise RuntimeError(
                 "cannot use --factory-reset together with a firmware image"
+            )
+        if options.flash_bootloader:
+            raise RuntimeError(
+                "cannot use --flash-bootloader together with a firmware image"
             )
 
     async with AsyncExitStack() as stack:
@@ -101,6 +110,10 @@ async def uploader(options, on_event: UploaderEventHandler) -> None:
             if options.firmware is not None:
                 async for target in upload_targets:
                     upload_task_group.start_upload_to(target)
+
+            if options.flash_bootloader:
+                async for target in upload_targets:
+                    upload_task_group.start_flash_bootloader_on(target)
 
             if options.factory_reset:
                 async for target in upload_targets:

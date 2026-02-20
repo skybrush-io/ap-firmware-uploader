@@ -234,6 +234,63 @@ class Uploader:
         """Loads the firmware file at the given path."""
         self._firmware = await load_firmware(path)
 
+    async def flash_bootloader(
+        self,
+        port: str,
+        *,
+        expecting_failure: bool = False,
+        on_event: Callable[[UploaderEvent], None],
+        on_expected_failure: Callable[[int], None] | None = None,
+    ) -> None:
+        """Runs an asynchronous task to flash the bootloader into the drone at
+        the given port.
+
+        Parameters:
+            port: the port to flash the bootloader to. May be an IP address or
+                the identifier of a serial port.
+            on_event: a synchronous callback to call when an event happens
+                during the bootloader flashing process. The callback will be
+                called with the event as its only argument. Typically this is
+                tied to a user interface object so the UI is updated during the
+                bootloader flashing properly.
+        """
+        on_event(UploaderLifecycleEvent(type="started"))
+        on_event(UploadStepEvent(step=UploadStep.CONNECTING))
+
+        success, cancelled, retrying = False, False, expecting_failure
+
+        def on_rebooted():
+            nonlocal retrying
+            retrying = True
+
+            # If the device has to be rebooted to reach the main firmware, we expect the
+            # next few operations to fail because of the reboot
+            if on_expected_failure:
+                on_expected_failure(10)
+
+        try:
+            transport = await self._create_transport(port)
+            async with BootloaderConnection(transport) as connection:
+                await connection.ensure_in_mavlink(on_rebooted=on_rebooted)
+                await connection.flash_bootloader()
+
+                on_event(UploadProgressEvent(progress=1))
+                on_event(UploadStepEvent(step=UploadStep.FINISHED))
+
+                success = True
+        except get_cancelled_exc_class():
+            cancelled = True
+            raise
+        finally:
+            on_event(
+                UploaderLifecycleEvent(
+                    type="finished",
+                    success=success,
+                    cancelled=cancelled,
+                    retrying=False,
+                )
+            )
+
     async def perform_factory_reset(
         self,
         port: str,
@@ -281,6 +338,7 @@ class Uploader:
                     # The connection may be already closed by the reboot, ignore this error
                     pass
 
+                on_event(UploadProgressEvent(progress=1))
                 on_event(UploadStepEvent(step=UploadStep.FINISHED))
 
                 success = True
@@ -663,6 +721,9 @@ class UploaderTaskGroup:
 
     def start_factory_reset_on(self, port: str) -> None:
         self._start_task(self._uploader.perform_factory_reset, port)
+
+    def start_flash_bootloader_on(self, port: str) -> None:
+        self._start_task(self._uploader.flash_bootloader, port)
 
     def start_upload_to(self, port: str) -> None:
         self._start_task(self._uploader.upload_firmware, port)

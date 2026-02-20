@@ -213,6 +213,28 @@ class BootloaderConnection(AbstractAsyncContextManager):
         else:
             raise RuntimeError("unknown mode, cannot reboot")
 
+    async def flash_bootloader(self) -> None:
+        """Sends a MAVLink command to flash the bootloader embedded in the main
+        firmware image.
+
+        The drone needs to be running the firmware (i.e. not the bootloader).
+        Works on ArduPilot only.
+        """
+        from .mavlink import MAV_CMD_FLASH_BOOTLOADER, MAVLinkCommandLongMessage
+
+        await self._send_mavlink_message(
+            MAVLinkCommandLongMessage(
+                0,  # target_system
+                1,  # target_component
+                MAV_CMD_FLASH_BOOTLOADER,
+                0,
+                0,
+                0,
+                0,
+                290876,  # magic number
+            )
+        )
+
     async def reset_to_factory_defaults(self) -> None:
         """Sends a MAVLink command to reset the parameters of the drone to factory
         defaults.
