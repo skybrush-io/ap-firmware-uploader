@@ -372,15 +372,21 @@ class BootloaderConnection(AbstractAsyncContextManager):
             MAVLinkCommandLongMessage,
         )
 
-        await self._send_mavlink_message(
-            MAVLinkCommandLongMessage(
-                0,  # target_system
-                1,  # target_component
-                MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
-                1,  # confirmation
-                3 if to_bootloader else 1,  # reboot or reboot to bootloader
+        # For some reason, PX4/DSS does not accept the MAVLink reboot command that we
+        # generate so we use a pre-generated version here
+        if to_bootloader:
+            msg = b"\xfe\x21\x45\xff\x00\x4c\x00\x00\x40\x40\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xf6\x00\x00\x00\x00\xcc\x37"
+            await self._transport.send(msg)
+        else:
+            await self._send_mavlink_message(
+                MAVLinkCommandLongMessage(
+                    0,  # target_system
+                    1,  # target_component
+                    MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN,
+                    1,  # confirmation
+                    3 if to_bootloader else 1,  # reboot or reboot to bootloader
+                )
             )
-        )
 
     def _get_mavlink(self) -> MAVLink:
         from .mavlink import MAVLink
@@ -390,7 +396,8 @@ class BootloaderConnection(AbstractAsyncContextManager):
         return self._mavlink
 
     async def _send_mavlink_message(self, message: MAVLinkMessage) -> None:
-        data = self._get_mavlink().encode(message, force_mavlink1=True)
+        force_mavlink1 = message.get_msg_id() < 256
+        data = self._get_mavlink().encode(message, force_mavlink1=force_mavlink1)
         await self._transport.send(data)
 
     async def _wait_for_heartbeat(self) -> MAVLinkHeartbeatMessage:
