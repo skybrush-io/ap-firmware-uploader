@@ -1,6 +1,6 @@
 [project]
 name = "ap-uploader"
-version = "0.1.0"
+version = "1.0.0"
 description = "Firmware uploader for ArduPilot and PX4 bootloaders"
 authors = [{ name = "Tamas Nepusz", email = "ntamas@gmail.com" }]
 license = "MIT"
