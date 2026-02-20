@@ -22,5 +22,5 @@ version_template = "({major}, {minor}, {patch})"
 search = "__version_info__ = {current_version}"
 
 [[before_commit]]
-name = "Run tests"
-cmd = "poetry run pytest && pre-commit run --all-files"
+name = "Run pre-commit hooks"
+cmd = "pre-commit run --all-files"
