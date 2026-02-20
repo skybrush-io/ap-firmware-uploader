@@ -1,10 +1,8 @@
-ap_uploader
-===========
+# ap_uploader
 
 Firmware uploader script for ArduPilot and PX4 bootloaders.
 
-Installation
-------------
+## Installation
 
 We use `uv` to manage a Python virtual environment that will contain all
 the dependencies. Install `uv` first if you don't have it yet, then follow
@@ -15,13 +13,13 @@ these steps:
 2. Run `uv sync` to create a virtualenv and install all the dependencies
    in it.
 
-3. Run `uv run ap-uploader -p 192.168.4.1 firmware.apj` to upload the
-   given firmware to a drone that is accessible via UDP packets on 192.168.4.1.
+3. Run `uv run ap-uploader -p /dev/ttyUSB0 firmware.apj` to upload the
+   given firmware to a drone that is accessible via a serial port on
+   `/dev/ttyUSB0`.
 
-License
--------
+## License
 
-Copyright 2022 CollMot Robotics Ltd.
+Copyright 2022-2026 CollMot Robotics Ltd.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
